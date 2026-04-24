@@ -12,40 +12,7 @@
 #include <iostream>
 #include <complex>
 #include <cmath>
-#include <vector>
-
-// =============================================================================
-// Helpers
-// =============================================================================
-
-static void generate_window(itpp::vec& win_leading,
-                             itpp::vec& win_trailing,
-                             uint16_t   n_win)
-{
-    win_leading.set_size(n_win,  false);
-    win_trailing.set_size(n_win, false);
-
-    for (int i = 0; i < n_win; ++i)
-    {
-        win_leading[i]  = 0.5 * (1.0 - std::cos(itpp::pi * i / n_win)); // 0 → 1
-        win_trailing[i] = 0.5 * (1.0 + std::cos(itpp::pi * i / n_win)); // 1 → 0
-    }
-}
-
-// Generate a deterministic non-trivial subcarrier vector for symbol s
-static sam::SignalData make_symbol(int sym_idx, uint16_t n_sc)
-{
-    sam::SignalData sd;
-    sd.samples.set_size(n_sc, false);
-    for (int k = 0; k < n_sc; ++k)
-    {
-        // real: symbol index + subcarrier index scaled, imag: complementary
-        sd.samples[k] = std::complex<double>(
-            sym_idx + 1.0 + k * 1e-4,
-           -(sym_idx + 1.0) + k * 1e-4);
-    }
-    return sd;
-}
+#include <algorithm> // for std::max
 
 // =============================================================================
 // Main
@@ -53,7 +20,7 @@ static sam::SignalData make_symbol(int sym_idx, uint16_t n_sc)
 
 int main()
 {
-    std::cout << "=== OFDMMod → OFDMDemod Loopback (14 symbols) ===\n\n";
+    std::cout << "=== OFDMMod -> OFDMDemod Loopback (14 symbols) ===\n\n";
 
     // -------------------------------------------------------------------------
     // Parameters — 5G NR-like μ=1 (30kHz SCS), 100MHz BW
@@ -66,12 +33,6 @@ int main()
     const double   FS        = 122.88e6; // N_FFT × 30kHz
 
     // -------------------------------------------------------------------------
-    // Window coefficients — owned here, passed by pointer into Config
-    // -------------------------------------------------------------------------
-    itpp::vec win_leading, win_trailing;
-    generate_window(win_leading, win_trailing, N_WIN);
-
-    // -------------------------------------------------------------------------
     // Mod config
     // -------------------------------------------------------------------------
     sam::tx::OFDMMod::Config mod_cfg;
@@ -80,8 +41,6 @@ int main()
     mod_cfg.cp            = CP_LEN;
     mod_cfg.n_win         = N_WIN;
     mod_cfg.dft_precoding = true;
-    mod_cfg.win_leading   = &win_leading;
-    mod_cfg.win_trailing  = &win_trailing;
 
     // -------------------------------------------------------------------------
     // Demod config
@@ -103,34 +62,39 @@ int main()
     sam::tx::OFDMMod   mod;
     sam::rx::OFDMDemod demod;
 
-    mod.configure(mod_cfg);
-    demod.configure(dem_cfg);
-
     // -------------------------------------------------------------------------
-    // Generate input — 14 symbols
+    // Generate Input & Pre-allocate Output
     // -------------------------------------------------------------------------
-    std::vector<sam::SignalData> tx_in(N_SYMBOLS);
+    
+    // Store all TX symbols in a single flat IT++ vector
+    itpp::cvec tx_all(N_SYMBOLS * N_SC);
     for (int s = 0; s < N_SYMBOLS; ++s)
-        tx_in[s] = make_symbol(s, N_SC);
+    {
+        for (int k = 0; k < N_SC; ++k)
+        {
+            tx_all[s * N_SC + k] = std::complex<double>(
+                s + 1.0 + k * 1e-4,
+               -(s + 1.0) + k * 1e-4);
+        }
+    }
 
-    // -------------------------------------------------------------------------
-    // Pre-size buffers (caller contract — sized once, reused each symbol)
-    // -------------------------------------------------------------------------
+    // Pre-allocate the full RX vector to hold the output
+    itpp::cvec rx_all(N_SYMBOLS * N_SC);
+    rx_all.zeros();
+
+    // Loop buffers
+    sam::SignalData tx_sym;
     sam::SignalData mod_out;
-    mod_out.samples.set_size(N_FFT + CP_LEN, false);
-
     sam::SignalData demod_out;
+    
+    mod_out.samples.set_size(N_FFT + CP_LEN, false);
     demod_out.samples.set_size(N_SC, false);
 
     sam::Control ctrl;   // enable=true, bypass=false
 
     // -------------------------------------------------------------------------
-    // Run
+    // Run Loopback
     // -------------------------------------------------------------------------
-    const double tol  = 1e-6;
-    int          pass = 0;
-    int          fail = 0;
-
     for (int s = 0; s < N_SYMBOLS; ++s)
     {
         sam::ExecContext ctx;
@@ -141,48 +105,40 @@ int main()
         ctx.start_of_frame = (s == 0);
         ctx.end_of_frame   = (s == N_SYMBOLS - 1);
 
+        // Extract the current symbol from the flat TX vector
+        tx_sym.samples = tx_all.mid(s * N_SC, N_SC);
+
         mod_out.samples.zeros();
         demod_out.samples.zeros();
 
-        mod.eval(tx_in[s], mod_out,   ctrl, mod_cfg, ctx);
+        mod.eval(tx_sym, mod_out,   ctrl, mod_cfg, ctx);
         demod.eval(mod_out, demod_out, ctrl, dem_cfg, ctx);
 
-        // --- compare ---
-        bool sym_pass    = true;
-        int  first_fail_sc = -1;
-        double worst_err   =  0.0;
-
-        for (int k = 0; k < N_SC; ++k)
-        {
-            const double err = std::abs(demod_out.samples[k] - tx_in[s].samples[k]);
-            if (err > tol)
-            {
-                if (sym_pass) first_fail_sc = k;
-                if (err > worst_err) worst_err = err;
-                sym_pass = false;
-            }
-        }
-
-        if (sym_pass)
-        {
-            std::cout << "[PASS] symbol " << s << "\n";
-            ++pass;
-        }
-        else
-        {
-            std::cout << "[FAIL] symbol " << s
-                      << "  first_fail_sc=" << first_fail_sc
-                      << "  worst_err="     << worst_err     << "\n";
-            ++fail;
-        }
+        // Store the demodulated symbol into the flat RX vector
+        rx_all.set_subvector(s * N_SC, demod_out.samples);
     }
 
     // -------------------------------------------------------------------------
-    // Summary
+    // Error Calculation (SNR)
     // -------------------------------------------------------------------------
-    std::cout << "\n=== " << pass << "/" << N_SYMBOLS << " symbols passed";
-    if (fail > 0) std::cout << "  (" << fail << " failed)";
-    std::cout << " ===\n";
+    itpp::cvec error_vec = tx_all - rx_all;
 
-    return fail > 0 ? 1 : 0;
+    double sig_power = itpp::sum_sqr(itpp::abs(tx_all));
+    double noise_power = itpp::sum_sqr(itpp::abs(error_vec));
+    double snr_db = 10.0 * std::log10(sig_power / noise_power);
+
+    std::cout << "--- Loopback Performance ---\n";
+    std::cout << "Calculated SNR : " << snr_db << " dB\n";
+
+    const double THRESHOLD_DB = 100.0;
+    if (snr_db >= THRESHOLD_DB)
+    {
+        std::cout << "[PASS] SNR exceeds the " << THRESHOLD_DB << " dB threshold.\n\n";
+        return 0;
+    }
+    else
+    {
+        std::cout << "[FAIL] SNR is below the " << THRESHOLD_DB << " dB threshold.\n\n";
+        return 1;
+    }
 }

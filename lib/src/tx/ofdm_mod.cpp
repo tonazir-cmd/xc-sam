@@ -19,21 +19,8 @@ namespace sam
 namespace tx
 {
 
-void OFDMMod::configure(const Config &cfg)
-{
-    ifft_in_.set_size(cfg.n_fft, false);
-    ifft_out_.set_size(cfg.n_fft, false);
-    fd_scratch_.set_size(cfg.n_sc, false);
-    if (cfg.n_win > 0) prev_tail_.set_size(cfg.n_win, false);
-}
-
 void OFDMMod::reset()
 {
-    // Zero-fill the scratch buffers.
-    fd_scratch_.zeros();
-    ifft_in_.zeros();
-    ifft_out_.zeros();
-
     // Clean and reset the windowing states.
     prev_tail_.zeros();
 }
@@ -56,106 +43,71 @@ void OFDMMod::eval(const Inputs &in,
     assert(cfg.n_sc % 12 == 0);
     assert(cfg.n_sc <= cfg.n_fft);
 
-    if (cfg.n_win > 0)
-    {
-        assert(cfg.n_win <= cfg.cp);
-        assert(cfg.win_leading != nullptr);
-        assert(cfg.win_trailing != nullptr);
-        assert(cfg.win_leading->size() == cfg.n_win);
-        assert(cfg.win_trailing->size() == cfg.n_win);
-        // We should not allow window resizing between symbols
-        // as the previous tail would be of a different length than the new window size.
-        if (ctx.symbol_idx > 0)  assert(prev_tail_.size() == cfg.n_win);
-    }
+    if (cfg.n_win > 0 && ctx.symbol_idx > 0) assert(prev_tail_.size() == cfg.n_win);
 
     assert(in.samples.size() == cfg.n_sc);
     assert(out.samples.size() == cfg.n_fft + cfg.cp);
-    
-    assert(fd_scratch_.length() == cfg.n_sc);
-    assert(ifft_in_.length() == cfg.n_fft);
-    assert(ifft_out_.length() == cfg.n_fft);
-
-    // -------------------------------------------------------------------------
-    // Lazy resizing of scratch and state buffers.
-    // -------------------------------------------------------------------------
-    ifft_in_.set_size(cfg.n_fft, false);
-    ifft_out_.set_size(cfg.n_fft, false);
-    fd_scratch_.set_size(cfg.n_sc, false);
-    if (cfg.n_win > 0 && ctx.symbol_idx == 0) prev_tail_.set_size(cfg.n_win, false);
 
     // -------------------------------------------------------------------------
     // Processing
     // -------------------------------------------------------------------------
 
-    if (cfg.dft_precoding)
-    {
-        apply_dft_precoding_(in.samples, fd_scratch_);
-        arrange_subcarriers_(fd_scratch_, ifft_in_, cfg.n_fft, cfg.n_sc);
-    }
-    else
-    {
-        arrange_subcarriers_(in.samples, ifft_in_, cfg.n_fft, cfg.n_sc);
-    }
-
-    itpp::ifft(ifft_in_, ifft_out_);
-
-    add_cyclic_prefix_(ifft_out_, out.samples, cfg.n_fft, cfg.cp);
-
-    if (cfg.n_win > 0)
-    {
-        apply_windowing_(out.samples, *cfg.win_leading, *cfg.win_trailing, cfg.cp, cfg.n_win, ctx.symbol_idx);
-    }
+    itpp::cvec subcarriers = (cfg.dft_precoding) ? apply_dft_precoding_(in.samples) : in.samples;
+    itpp::cvec ifft_in = arrange_subcarriers_(subcarriers, cfg.n_fft, cfg.n_sc);
+    itpp::cvec ifft_out = itpp::ifft(ifft_in);
+    out.samples = add_cyclic_prefix_(ifft_out, cfg.n_fft, cfg.cp);
+    if (cfg.n_win > 0) out.samples = apply_windowing_(out.samples, cfg.cp, cfg.n_win, ctx.symbol_idx);
 }
 
 // =============================================================================
 // Private Helpers
 // =============================================================================
 
-void OFDMMod::apply_dft_precoding_(const itpp::cvec &in_sc,
-                                    itpp::cvec &out_sc)
+itpp::cvec OFDMMod::apply_dft_precoding_(const itpp::cvec &in_sc)
 {
-    // TODO: Verify this implementation
-    out_sc = itpp::fft(in_sc);
-    out_sc /= std::sqrt(static_cast<double>(in_sc.size()));
+    return itpp::fft(in_sc) / std::sqrt(static_cast<double>(in_sc.size()));
 }
 
-void OFDMMod::arrange_subcarriers_(const itpp::cvec &sc_data,
-                                    itpp::cvec &ifft_in,
-                                    uint16_t n_fft, uint16_t n_sc)
+itpp::cvec OFDMMod::arrange_subcarriers_(const itpp::cvec &sc_data,
+                                         uint16_t n_fft, uint16_t n_sc)
 {
     const int half = n_sc / 2; // positive-negative frequency half
     
+    itpp::cvec ifft_in(n_fft);
     ifft_in.zeros();
-
-    for (int i = 0; i < half; ++i)
-    {
-        ifft_in[n_fft - half + i] = sc_data[i]; // negative frequencies
-        ifft_in[i] = sc_data[half + i];         // positive frequencies
-    }
-
+    ifft_in.set_subvector(n_fft - half, sc_data.mid(0, half)); // negative frequencies
+    ifft_in.set_subvector(0, sc_data.mid(half, half)); // positive frequencies
+    return ifft_in;
 }
 
-void OFDMMod::add_cyclic_prefix_(const itpp::cvec &time_sym,
-                                    itpp::cvec &sym_with_cp,
+itpp::cvec OFDMMod::add_cyclic_prefix_(const itpp::cvec &time_sym,
                                     uint16_t n_fft, uint16_t cp)
 {
-    for (int i = 0; i < cp; ++i) sym_with_cp[i] = time_sym[n_fft - cp + i];
-    for (int i = 0; i < n_fft; ++i) sym_with_cp[cp + i] = time_sym[i];
+    itpp::cvec sym_with_cp(n_fft + cp);
+    sym_with_cp.set_subvector(0, time_sym.mid(n_fft - cp, cp)); // cyclic prefix
+    sym_with_cp.set_subvector(cp, time_sym); // useful symbol
+    return sym_with_cp;
 }
 
-void OFDMMod::apply_windowing_(itpp::cvec &sym_with_cp,
-                              itpp::vec &win_leading,
-                              itpp::vec &win_trailing,
-                              uint16_t cp, uint16_t n_win, uint16_t symbol_idx)
+itpp::cvec OFDMMod::apply_windowing_(const itpp::cvec &sym_with_cp,
+                                    uint16_t cp, uint16_t n_win, uint16_t symbol_idx)
 {
-    for (int i = 0; i < n_win; ++i) sym_with_cp[i] *= win_leading[i];
+    itpp::vec cos_curve = itpp::cos(itpp::pi * itpp::linspace(0, n_win - 1, n_win) / n_win);
+    itpp::cvec win_leading  = itpp::to_cvec(0.5 * (1.0 - cos_curve)); // 0 → 1
+    itpp::cvec win_trailing = itpp::to_cvec(0.5 * (1.0 + cos_curve)); // 1 → 0
+
+    itpp::cvec windowed_sym = sym_with_cp;
+    itpp::cvec leading_edge = itpp::elem_mult(sym_with_cp.mid(0, n_win), win_leading);
+    windowed_sym.set_subvector(0, leading_edge);
 
     if (symbol_idx > 0)
     {
-        for (int i = 0; i < n_win; ++i) sym_with_cp[i] += prev_tail_[i] * win_trailing[i];
+        itpp::cvec overlap = itpp::elem_mult(prev_tail_, win_trailing);
+        windowed_sym.set_subvector(0, windowed_sym.mid(0, n_win) + overlap);
     }
 
-    for (int i = 0; i < n_win; i++) prev_tail_[i] = sym_with_cp[cp + i];
+    prev_tail_ = sym_with_cp.mid(cp, n_win);
+    return windowed_sym;
 }
 
 } // namespace tx

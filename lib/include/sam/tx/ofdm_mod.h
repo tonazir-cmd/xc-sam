@@ -8,7 +8,7 @@
 // Processing Unit: ONE OFDM Symbol per eval() call.
 //
 // Processing Steps (in order):
-//   1. Transform Precoding  — optional DFT spreading (LTE/5G UL SC-FDMA only)
+//   1. Transform Precoding  — optional DFT spreading (LTE)
 //   2. IFFT                 — frequency → time domain conversion
 //   3. CP Addition          — prepend last cp samples to mitigate ISI
 //   4. Windowing/Filtering  — smooth symbol edges to reduce OOB emissions
@@ -60,11 +60,11 @@ public:
     // Config — block-local configuration struct.
     //
     // Fields:
-    //   n_fft   — FFT/IFFT size (e.g. 512, 1024, 2048, 4096)
-    //   n_sc    — number of active (occupied) subcarriers; must be ≤ n_fft
-    //   cp      — cyclic prefix length in samples
-    //   n_win   — windowing ramp length (samples per edge); 0 = disabled
-    //   win     — master enable for windowing stage
+    //   n_fft         — FFT/IFFT size (e.g. 512, 1024, 2048, 4096)
+    //   n_sc          — number of active (occupied) subcarriers; must be ≤ n_fft
+    //   cp            — cyclic prefix length in samples
+    //   n_win         — windowing ramp length (samples per edge); 0 = disabled
+    //   dft_precoding — enable or disbale dft precoding (true for LTE)
     //
     // Caller can pass it through the standard eval() interface.
     //
@@ -75,9 +75,7 @@ public:
         uint16_t n_sc   = 1200;   // active subcarriers (must be ≤ n_fft)
         uint16_t cp     = 144;    // cyclic prefix length [samples]
         uint16_t n_win  = 0;      // windowing ramp length [samples]; 0 = none
-        bool     dft_precoding = false; // true for LTE/5G UL SC-FDMA path
-        itpp::vec* win_leading = nullptr;  // pre-computed window coefficients (leading edge)
-        itpp::vec* win_trailing = nullptr; // pre-computed window coefficients (trailing edge)
+        bool     dft_precoding = false; // true for LTE
     };
 
     // -------------------------------------------------------------------------
@@ -94,14 +92,6 @@ public:
     // Move or passing by reference is allowed.
     OFDMMod(OFDMMod&&)            = default;
     OFDMMod& operator=(OFDMMod&&) = default;
-
-    // -------------------------------------------------------------------------
-    // configure()
-    //
-    // Configures and does memory allocation for all internal buffers and states.
-    // Not required but can improve performance if called before hand
-    // -------------------------------------------------------------------------
-    void configure(const Config& cfg);
 
     // -------------------------------------------------------------------------
     // reset()
@@ -145,8 +135,7 @@ private:
     // The output is scaled by 1/sqrt(N) to preserve power.
     //
     // -------------------------------------------------------------------------
-    void apply_dft_precoding_(const itpp::cvec& in_sc,
-                                    itpp::cvec& out_sc);
+    itpp::cvec apply_dft_precoding_(const itpp::cvec& in_sc);
 
     // -------------------------------------------------------------------------
     // arrange_subcarriers_()
@@ -161,9 +150,8 @@ private:
     // Writes directly into ifft_in_ (owning member buffer).
     //
     // -------------------------------------------------------------------------
-    void arrange_subcarriers_(const itpp::cvec& sc_data, 
-                                    itpp::cvec& ifft_in, 
-                              uint16_t n_fft, uint16_t n_sc);
+    itpp::cvec arrange_subcarriers_(const itpp::cvec& sc_data,
+                                    uint16_t n_fft, uint16_t n_sc);
 
     // -------------------------------------------------------------------------
     // add_cyclic_prefix_()
@@ -175,9 +163,8 @@ private:
     //            <- cyclic prefix (cp) ->        <- useful symbol ->
     //
     // -------------------------------------------------------------------------
-    void add_cyclic_prefix_(const itpp::cvec& time_sym,
-                                  itpp::cvec& sym_with_cp,
-                            uint16_t n_fft, uint16_t cp);
+    itpp::cvec add_cyclic_prefix_(const itpp::cvec& time_sym,
+                                  uint16_t n_fft, uint16_t cp);
 
     // -------------------------------------------------------------------------
     // apply_windowing_()
@@ -192,19 +179,8 @@ private:
     // No-op when n_win == 0 or cfg.win == false.
     //
     // -------------------------------------------------------------------------
-    void apply_windowing_(itpp::cvec& sym_with_cp,
-                          itpp::vec &win_leading, itpp::vec &win_trailing,
-                          uint16_t cp, uint16_t n_win, uint16_t symbol_idx);
-
-
-    // =========================================================================
-    // Private scratch buffers
-    // =========================================================================
-
-    // scratch buffers — lazily resized inside eval() if cfg changes
-    itpp::cvec ifft_in_;            // n_fft-point IFFT input (zero-padded grid)
-    itpp::cvec ifft_out_;           // n_fft-point IFFT output (time domain)
-    itpp::cvec fd_scratch_;         // DFT precoding intermediate buffer (n_sc)
+    itpp::cvec apply_windowing_(const itpp::cvec& sym_with_cp,
+                                uint16_t cp, uint16_t n_win, uint16_t symbol_idx);
 
     // =========================================================================
     // Private state
