@@ -63,21 +63,23 @@ itpp::cvec OFDMDemod::apply_front_end_corrections_(const itpp::cvec& in_samples,
     
     const double ts = 1.0 / cfg.sample_rate;
     
-    size_t start_idx = ctx.sample_count + cfg.cp;
+    size_t start_idx = ctx.sample_count + cfg.cp + cfg.to; // compensate time offset
     size_t end_idx = start_idx + cfg.n_fft - 1;
     itpp::vec t = itpp::linspace(start_idx, end_idx, cfg.n_fft) * ts;
-    itpp::vec theta = (2.0 * itpp::pi * cfg.freq_offset * t) + cfg.phase;
+    itpp::vec theta = (2.0 * itpp::pi * cfg.fo * t) + cfg.phase;
     itpp::cvec correction = cfg.gain * itpp::exp(std::complex<double>(0, 1) * theta);
     return itpp::elem_mult(in_samples.mid(cfg.cp, cfg.n_fft), correction);
 }
 
 itpp::cvec OFDMDemod::extract_subcarriers_(const itpp::cvec& fft_out,
-                                     uint16_t n_fft, uint16_t n_sc, uint16_t dc_offset)
+                                     uint16_t n_fft, uint16_t n_sc, bool dc)
 {
     const int half = n_sc / 2;
+    const int pos_start_idx = dc ? 1 : 0; // incase of dc nulling, start positive frequencies from index 1 instead of 0
+    
     itpp::cvec sc_data(n_sc);
     sc_data.set_subvector(0, fft_out.mid(n_fft - half, half)); // Negative frequencies
-    sc_data.set_subvector(half, fft_out.mid(dc_offset, half)); // Positive frequencies
+    sc_data.set_subvector(half, fft_out.mid(pos_start_idx, half)); // Positive frequencies
     return sc_data;
 }
 

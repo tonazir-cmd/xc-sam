@@ -20,7 +20,13 @@ endif
 # -----------------------------------------------------------------------------
 # ITPP
 # -----------------------------------------------------------------------------
-ITPP_CFLAGS := $(shell pkg-config --cflags itpp)
+ITPP_RAW_FLAGS := $(shell pkg-config --cflags itpp)
+
+ifeq ($(BUILD),release)
+    ITPP_CFLAGS := $(ITPP_RAW_FLAGS)
+else
+    ITPP_CFLAGS := $(filter-out -DNDEBUG -O3 -O2, $(ITPP_RAW_FLAGS))
+endif
 
 # -----------------------------------------------------------------------------
 # Paths

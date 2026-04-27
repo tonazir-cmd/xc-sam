@@ -42,7 +42,8 @@ void OFDMMod::eval(const Inputs &in,
     // -------------------------------------------------------------------------
     assert(cfg.n_sc % 12 == 0);
     assert(cfg.n_sc <= cfg.n_fft);
-
+    assert(cfg.n_win <= cfg.cp);
+    
     if (cfg.n_win > 0 && ctx.symbol_idx > 0) assert(prev_tail_.size() == cfg.n_win);
 
     assert(in.samples.size() == cfg.n_sc);
@@ -53,7 +54,7 @@ void OFDMMod::eval(const Inputs &in,
     // -------------------------------------------------------------------------
 
     itpp::cvec subcarriers = (cfg.dft_precoding) ? apply_dft_precoding_(in.samples) : in.samples;
-    itpp::cvec ifft_in = arrange_subcarriers_(subcarriers, cfg.n_fft, cfg.n_sc);
+    itpp::cvec ifft_in = arrange_subcarriers_(subcarriers, cfg.n_fft, cfg.n_sc, cfg.dc);
     itpp::cvec ifft_out = itpp::ifft(ifft_in);
     out.samples = add_cyclic_prefix_(ifft_out, cfg.n_fft, cfg.cp);
     if (cfg.n_win > 0) out.samples = apply_windowing_(out.samples, cfg.cp, cfg.n_win, ctx.symbol_idx);
@@ -69,14 +70,14 @@ itpp::cvec OFDMMod::apply_dft_precoding_(const itpp::cvec &in_sc)
 }
 
 itpp::cvec OFDMMod::arrange_subcarriers_(const itpp::cvec &sc_data,
-                                         uint16_t n_fft, uint16_t n_sc)
+                                         uint16_t n_fft, uint16_t n_sc, bool dc)
 {
     const int half = n_sc / 2; // positive-negative frequency half
-    
+    int pos_start_idx = dc ? 1 : 0; // incase of dc nulling, start positive frequencies from index 1 instead of 0
     itpp::cvec ifft_in(n_fft);
     ifft_in.zeros();
     ifft_in.set_subvector(n_fft - half, sc_data.mid(0, half)); // negative frequencies
-    ifft_in.set_subvector(0, sc_data.mid(half, half)); // positive frequencies
+    ifft_in.set_subvector(pos_start_idx, sc_data.mid(half, half)); // positive frequencies
     return ifft_in;
 }
 

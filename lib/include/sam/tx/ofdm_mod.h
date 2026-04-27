@@ -76,6 +76,7 @@ public:
         uint16_t cp     = 144;    // cyclic prefix length [samples]
         uint16_t n_win  = 0;      // windowing ramp length [samples]; 0 = none
         bool     dft_precoding = false; // true for LTE
+        bool     dc = 0;         // true for LTE (null DC subcarrier)
     };
 
     // -------------------------------------------------------------------------
@@ -151,7 +152,7 @@ private:
     //
     // -------------------------------------------------------------------------
     itpp::cvec arrange_subcarriers_(const itpp::cvec& sc_data,
-                                    uint16_t n_fft, uint16_t n_sc);
+                                    uint16_t n_fft, uint16_t n_sc, bool dc);
 
     // -------------------------------------------------------------------------
     // add_cyclic_prefix_()

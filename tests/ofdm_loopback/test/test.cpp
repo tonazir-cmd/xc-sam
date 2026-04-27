@@ -1,6 +1,6 @@
 // =============================================================================
-// test.cpp — OFDMMod → OFDMDemod loopback test
-// 14 symbols, n_fft=4096, DFT precoding, windowing
+// test.cpp — OFDMMod -> Channel -> OFDMDemod Parametric Sweep
+// Extracted inner loopback into run_ofdm_loopback(); main sweeps test_configs.
 // =============================================================================
 
 #include "sam/core/signal_types.h"
@@ -12,133 +12,274 @@
 #include <iostream>
 #include <complex>
 #include <cmath>
-#include <algorithm> // for std::max
+#include <algorithm>
+#include <array>
+#include <vector>
+#include <string>
+#include <iomanip>
+#include <limits>
+#include <cassert>
+
 
 // =============================================================================
-// Main
+// OFDMTestConfig
 // =============================================================================
+struct OFDMTestConfig {
+    bool is_lte = true;
+    
+    double sample_rate  = 122.88e6;
+    uint16_t n_fft = 4096;
+    uint16_t n_sym = 14;
+    uint16_t n_sc  = 3276;
+    uint16_t cp    = 288;
+    uint16_t n_win = 64;
 
-int main()
+    double   gain    = 1.0;
+    double   fo      = 0.0;
+    size_t   to      = 0;
+
+    // Overloading the insertion operator
+    friend std::ostream& operator<<(std::ostream& os, const OFDMTestConfig& cfg) {
+        os << "--- OFDM Test Configuration ---\n"
+           << std::left << std::setw(15) << "Mode:"        << (cfg.is_lte ? "LTE" : "5G") << "\n"
+           << std::setw(15) << "Sample Rate:" << cfg.sample_rate / 1e6 << " MHz\n"
+           << std::setw(15) << "FFT Size:"    << cfg.n_fft << "\n"
+           << std::setw(15) << "Subcarriers:" << cfg.n_sc << "\n"
+           << std::setw(15) << "CP Length:"   << cfg.cp << "\n"
+           << std::setw(15) << "Symbols:"      << cfg.n_sym << "\n"
+           << std::setw(15) << "Windowing:"   << cfg.n_win << "\n"
+           << std::setw(15) << "Gain:"        << cfg.gain << "\n"
+           << std::setw(15) << "Freq Offset:" << cfg.fo << " Hz\n"
+           << std::setw(15) << "Time Offset:" << cfg.to << " samples\n"
+           << "-------------------------------";
+        return os;
+    }
+};
+
+std::vector<OFDMTestConfig> generate_configs() {
+    
+    const size_t n_sym = 14;
+    const double scs = 15e3; // subcarrier spacing
+
+    struct NFFTGroupConfig {
+        uint16_t n_fft;
+        uint16_t n_sc;
+        uint16_t cp;
+    };
+
+    const std::array<NFFTGroupConfig, 6> configs_nfft_group = {{
+        {128,  72,   9},
+        {256,  132,  18},
+        {512,  252,  36},
+        {1024, 516,  72},
+        {2048, 1020, 144},
+        {4096, 3300, 288}
+    }};
+
+    const std::array<uint16_t, 2> configs_n_win = {0, 64};
+    const std::array<double, 3> configs_gain = {1.0, 2.0, 5.0};
+    const std::array<double, 3> configs_fo = {0.0, 100.0, -100.0};
+    const std::array<size_t, 3> configs_to = {0, 5, 10};
+    const std::array<bool, 2> configs_lte = {true, false};
+
+    std::vector<OFDMTestConfig> all_configs;
+    all_configs.reserve(
+        configs_nfft_group.size() * configs_n_win.size() * configs_gain.size() * configs_fo.size() * configs_to.size() * configs_lte.size()
+    ); // Pre-allocate memory
+
+    for (const auto& nfft_group : configs_nfft_group) {
+        for (auto n_win : configs_n_win) {
+            for (auto gain : configs_gain) {
+                for (auto fo : configs_fo) {
+                    for (auto to : configs_to) {
+                        for (auto lte : configs_lte) {
+                            if (n_win > nfft_group.cp) continue; // Skip invalid config
+                            double sample_rate = nfft_group.n_fft * scs;
+                            all_configs.push_back(OFDMTestConfig{
+                                lte,
+                                sample_rate,
+                                nfft_group.n_fft,
+                                n_sym,
+                                nfft_group.n_sc,
+                                nfft_group.cp,
+                                n_win,
+                                gain,
+                                fo,
+                                to
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return all_configs;
+}
+
+// =============================================================================
+// ChannelSimulator
+// =============================================================================
+static void apply_channel(const itpp::cvec& in, itpp::cvec& out,
+                           double rx_gain, double rx_fo, double rx_to, double fs)
 {
-    std::cout << "=== OFDMMod -> OFDMDemod Loopback (14 symbols) ===\n\n";
+    double ch_gain = 1.0 / rx_gain;
+    double ch_fo = -rx_fo;
 
-    // -------------------------------------------------------------------------
-    // Parameters — 5G NR-like μ=1 (30kHz SCS), 100MHz BW
-    // -------------------------------------------------------------------------
-    const uint16_t N_FFT     = 4096;
-    const uint16_t N_SC      = 3276;    // 273 RBs × 12 subcarriers
-    const uint16_t CP_LEN    = 288;     // normal CP for μ=1
-    const uint16_t N_WIN     = 64;      // windowing ramp length (must be ≤ CP)
-    const int      N_SYMBOLS = 14;
-    const double   FS        = 122.88e6; // N_FFT × 30kHz
+    assert(rx_to >= 0 && rx_to < in.length());
 
-    // -------------------------------------------------------------------------
-    // Mod config
-    // -------------------------------------------------------------------------
+    // Time offset
+    itpp::cvec sig = itpp::concat(itpp::zeros_c(static_cast<int>(rx_to)), in);
+
+    // Gain offset
+    sig *= ch_gain;
+
+    // Frequency offset
+    int n = sig.length();
+    itpp::vec idx   = itpp::linspace(0, n - 1, n);
+    itpp::vec phase = (2.0 * M_PI * ch_fo / fs) * idx;
+    itpp::cvec rot  = itpp::to_cvec(itpp::cos(phase), itpp::sin(phase));
+    out = elem_mult(sig, rot);
+}
+
+// =============================================================================
+// run_ofdm_loopback
+//
+// Parameters
+//   cfg      — all OFDM + channel parameters
+//   tx_input — input subcarrier bins, length must be cfg.n_sym * cfg.n_sc
+//
+// Returns received signal
+// =============================================================================
+itpp::cvec run_ofdm_loopback(const OFDMTestConfig& cfg, const itpp::cvec& tx_input)
+{
+    const int sym_len   = cfg.n_fft + cfg.cp;
+    const int n_sym     = cfg.n_sym;
+    const int rx_sync   = static_cast<int>(cfg.to);
+
+    assert(static_cast<int>(tx_input.length()) == n_sym * cfg.n_sc);
+
+    // --- Build mod / demod configs -------------------------------------------
     sam::tx::OFDMMod::Config mod_cfg;
-    mod_cfg.n_fft         = N_FFT;
-    mod_cfg.n_sc          = N_SC;
-    mod_cfg.cp            = CP_LEN;
-    mod_cfg.n_win         = N_WIN;
-    mod_cfg.dft_precoding = true;
+    mod_cfg.n_fft         = cfg.n_fft;
+    mod_cfg.n_sc          = cfg.n_sc;
+    mod_cfg.n_win         = cfg.n_win;
+    mod_cfg.cp            = cfg.cp;
+    mod_cfg.dft_precoding = cfg.is_lte;
+    mod_cfg.dc            = cfg.is_lte;
 
-    // -------------------------------------------------------------------------
-    // Demod config
-    // -------------------------------------------------------------------------
     sam::rx::OFDMDemod::Config dem_cfg;
-    dem_cfg.n_fft         = N_FFT;
-    dem_cfg.n_sc          = N_SC;
-    dem_cfg.cp            = CP_LEN;
-    dem_cfg.dc            = 0;      // no DC subcarrier
-    dem_cfg.dft_precoding = true;
-    dem_cfg.sample_rate   = FS;
-    dem_cfg.freq_offset   = 0.0;
-    dem_cfg.phase         = 0.0;
-    dem_cfg.gain          = 1.0;
+    dem_cfg.n_fft         = cfg.n_fft;
+    dem_cfg.n_sc          = cfg.n_sc;
+    dem_cfg.cp            = cfg.cp;
+    dem_cfg.dc            = cfg.is_lte;
+    dem_cfg.dft_precoding = cfg.is_lte;
+    dem_cfg.sample_rate   = cfg.sample_rate;
+    dem_cfg.fo            = cfg.fo;
+    dem_cfg.to            = cfg.to;
+    dem_cfg.gain          = cfg.gain;
 
-    // -------------------------------------------------------------------------
-    // Blocks
-    // -------------------------------------------------------------------------
     sam::tx::OFDMMod   mod;
     sam::rx::OFDMDemod demod;
+    sam::Control       ctrl;
 
-    // -------------------------------------------------------------------------
-    // Generate Input & Pre-allocate Output
-    // -------------------------------------------------------------------------
-    
-    // Store all TX symbols in a single flat IT++ vector
-    itpp::cvec tx_all(N_SYMBOLS * N_SC);
-    for (int s = 0; s < N_SYMBOLS; ++s)
+    itpp::cvec tx_waveform(n_sym * sym_len);
+    itpp::cvec rx_waveform;
+    itpp::cvec rx_output(n_sym * cfg.n_sc);
+    tx_waveform.zeros();
+    rx_output.zeros();
+
+    sam::SignalData tx_sym, mod_out, demod_in, demod_out;
+    mod_out.samples.set_size(sym_len,    false);
+    demod_in.samples.set_size(sym_len,   false);
+    demod_out.samples.set_size(cfg.n_sc, false);
+
+    // =========================================================================
+    // LOOP 1: Modulate
+    // =========================================================================
+    for (int s = 0; s < n_sym; ++s)
     {
-        for (int k = 0; k < N_SC; ++k)
-        {
-            tx_all[s * N_SC + k] = std::complex<double>(
-                s + 1.0 + k * 1e-4,
-               -(s + 1.0) + k * 1e-4);
+        sam::ExecContext ctx;
+        ctx.symbol_idx     = s;
+        ctx.slot_idx       = 0;
+        ctx.frame_idx      = 0;
+        ctx.sample_count   = static_cast<uint64_t>(s) * sym_len;
+        ctx.start_of_frame = (s == 0);
+        ctx.end_of_frame   = (s == n_sym - 1);
+
+        tx_sym.samples = tx_input.mid(s * cfg.n_sc, cfg.n_sc);
+        mod_out.samples.zeros();
+
+        mod.eval(tx_sym, mod_out, ctrl, mod_cfg, ctx);
+        tx_waveform.set_subvector(s * sym_len, mod_out.samples);
+    }
+
+    // =========================================================================
+    // LOOP 2: Apply channel
+    // =========================================================================
+    apply_channel(tx_waveform, rx_waveform,
+                  cfg.gain, cfg.fo, cfg.to, cfg.sample_rate);
+
+    // =========================================================================
+    // LOOP 3: Demodulate (with integer time-offset compensation)
+    // =========================================================================
+    for (int s = 0; s < n_sym; ++s)
+    {
+        sam::ExecContext ctx;
+        ctx.symbol_idx     = s;
+        ctx.slot_idx       = 0;
+        ctx.frame_idx      = 0;
+        ctx.sample_count   = static_cast<uint64_t>(s) * sym_len;
+        ctx.start_of_frame = (s == 0);
+        ctx.end_of_frame   = (s == n_sym - 1);
+
+        demod_in.samples.zeros();
+        demod_out.samples.zeros();
+
+        int start_idx = rx_sync + s * sym_len;
+        demod_in.samples = rx_waveform.mid(start_idx, sym_len);
+
+        demod.eval(demod_in, demod_out, ctrl, dem_cfg, ctx);
+        rx_output.set_subvector(s * cfg.n_sc, demod_out.samples);
+    }
+
+    return rx_output;
+}
+
+// =============================================================================
+// Main — parameter sweep
+// =============================================================================
+int main()
+{
+    std::cout << "=== OFDM Parametric Loopback Sweep ===\n\n";
+
+    size_t total = 0;
+    size_t failed = 0;
+
+    const size_t pass_threshold_db = 100;
+    std::vector<OFDMTestConfig> test_configs = generate_configs();
+
+    for (const auto& cfg : test_configs)
+    {
+        itpp::cvec tx_input = itpp::randn_c(cfg.n_sym * cfg.n_sc);
+        itpp::cvec rx_output = run_ofdm_loopback(cfg, tx_input);
+
+        itpp::cvec err = tx_input - rx_output;
+        double sig_pwr = itpp::sum_sqr(itpp::abs(tx_input));
+        double err_pwr = itpp::sum_sqr(itpp::abs(err));
+        double snr_db = 10.0 * std::log10(sig_pwr / err_pwr);
+
+        bool passed = (snr_db >= pass_threshold_db);
+        total++;
+        if (!passed) {
+            std::cerr << "Test failed for config:\n" << cfg << "\n";
+            std::cerr << "SNR: " << snr_db << " dB (below threshold of " << pass_threshold_db << " dB)\n";
+            failed++;
         }
     }
 
-    // Pre-allocate the full RX vector to hold the output
-    itpp::cvec rx_all(N_SYMBOLS * N_SC);
-    rx_all.zeros();
+    std::cout << "Result:\n"
+     << "Total: " << total << " | Passed: " << (total - failed) << " | Failed: " << failed << "\n"
+     << "Overall: " << (failed == 0 ? "PASS" : "FAIL") << "\n";
 
-    // Loop buffers
-    sam::SignalData tx_sym;
-    sam::SignalData mod_out;
-    sam::SignalData demod_out;
-    
-    mod_out.samples.set_size(N_FFT + CP_LEN, false);
-    demod_out.samples.set_size(N_SC, false);
-
-    sam::Control ctrl;   // enable=true, bypass=false
-
-    // -------------------------------------------------------------------------
-    // Run Loopback
-    // -------------------------------------------------------------------------
-    for (int s = 0; s < N_SYMBOLS; ++s)
-    {
-        sam::ExecContext ctx;
-        ctx.symbol_idx   = s;
-        ctx.slot_idx     = 0;
-        ctx.frame_idx    = 0;
-        ctx.sample_count = static_cast<uint64_t>(s) * (N_FFT + CP_LEN);
-        ctx.start_of_frame = (s == 0);
-        ctx.end_of_frame   = (s == N_SYMBOLS - 1);
-
-        // Extract the current symbol from the flat TX vector
-        tx_sym.samples = tx_all.mid(s * N_SC, N_SC);
-
-        mod_out.samples.zeros();
-        demod_out.samples.zeros();
-
-        mod.eval(tx_sym, mod_out,   ctrl, mod_cfg, ctx);
-        demod.eval(mod_out, demod_out, ctrl, dem_cfg, ctx);
-
-        // Store the demodulated symbol into the flat RX vector
-        rx_all.set_subvector(s * N_SC, demod_out.samples);
-    }
-
-    // -------------------------------------------------------------------------
-    // Error Calculation (SNR)
-    // -------------------------------------------------------------------------
-    itpp::cvec error_vec = tx_all - rx_all;
-
-    double sig_power = itpp::sum_sqr(itpp::abs(tx_all));
-    double noise_power = itpp::sum_sqr(itpp::abs(error_vec));
-    double snr_db = 10.0 * std::log10(sig_power / noise_power);
-
-    std::cout << "--- Loopback Performance ---\n";
-    std::cout << "Calculated SNR : " << snr_db << " dB\n";
-
-    const double THRESHOLD_DB = 100.0;
-    if (snr_db >= THRESHOLD_DB)
-    {
-        std::cout << "[PASS] SNR exceeds the " << THRESHOLD_DB << " dB threshold.\n\n";
-        return 0;
-    }
-    else
-    {
-        std::cout << "[FAIL] SNR is below the " << THRESHOLD_DB << " dB threshold.\n\n";
-        return 1;
-    }
+    return failed == 0 ? 0 : 1;
 }
