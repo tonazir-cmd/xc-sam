@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstdint>
 #include <filesystem>
+#include <algorithm>
 
 #include "config.h"
 
