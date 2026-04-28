@@ -3,6 +3,7 @@
 // Extracted inner loopback into run_ofdm_loopback(); main sweeps test_configs.
 // =============================================================================
 
+#include "sam/core/constants.h"
 #include "sam/core/signal_types.h"
 #include "sam/tx/ofdm_mod.h"
 #include "sam/rx/ofdm_demod.h"
@@ -25,18 +26,17 @@
 // OFDMTestConfig
 // =============================================================================
 struct OFDMTestConfig {
-    bool is_lte = true;
+    bool is_lte;
     
-    double sample_rate  = 122.88e6;
-    uint16_t n_fft = 4096;
-    uint16_t n_sym = 14;
-    uint16_t n_sc  = 3276;
-    uint16_t cp    = 288;
-    uint16_t n_win = 64;
+    double sample_rate;
+    uint16_t n_fft;
+    uint16_t n_sc;
+    uint16_t cp;
+    uint16_t n_win;
 
-    double   gain    = 1.0;
-    double   fo      = 0.0;
-    size_t   to      = 0;
+    double gain;
+    double fo;
+    size_t to;
 
     // Overloading the insertion operator
     friend std::ostream& operator<<(std::ostream& os, const OFDMTestConfig& cfg) {
@@ -46,7 +46,7 @@ struct OFDMTestConfig {
            << std::setw(15) << "FFT Size:"    << cfg.n_fft << "\n"
            << std::setw(15) << "Subcarriers:" << cfg.n_sc << "\n"
            << std::setw(15) << "CP Length:"   << cfg.cp << "\n"
-           << std::setw(15) << "Symbols:"      << cfg.n_sym << "\n"
+           << std::setw(15) << "Symbols:"     << N_SYM << "\n"
            << std::setw(15) << "Windowing:"   << cfg.n_win << "\n"
            << std::setw(15) << "Gain:"        << cfg.gain << "\n"
            << std::setw(15) << "Freq Offset:" << cfg.fo << " Hz\n"
@@ -58,7 +58,6 @@ struct OFDMTestConfig {
 
 std::vector<OFDMTestConfig> generate_configs() {
     
-    const size_t n_sym = 14;
     const double scs = 15e3; // subcarrier spacing
 
     struct NFFTGroupConfig {
@@ -99,7 +98,6 @@ std::vector<OFDMTestConfig> generate_configs() {
                                 lte,
                                 sample_rate,
                                 nfft_group.n_fft,
-                                n_sym,
                                 nfft_group.n_sc,
                                 nfft_group.cp,
                                 n_win,
@@ -141,25 +139,7 @@ static void apply_channel(const itpp::cvec& in, itpp::cvec& out,
     out = elem_mult(sig, rot);
 }
 
-// =============================================================================
-// run_ofdm_loopback
-//
-// Parameters
-//   cfg      — all OFDM + channel parameters
-//   tx_input — input subcarrier bins, length must be cfg.n_sym * cfg.n_sc
-//
-// Returns received signal
-// =============================================================================
-itpp::cvec run_ofdm_loopback(const OFDMTestConfig& cfg, const itpp::cvec& tx_input)
-{
-    const int sym_len   = cfg.n_fft + cfg.cp;
-    const int n_sym     = cfg.n_sym;
-    const int rx_sync   = static_cast<int>(cfg.to);
-
-    assert(static_cast<int>(tx_input.length()) == n_sym * cfg.n_sc);
-
-    // --- Build mod / demod configs -------------------------------------------
-    sam::tx::OFDMMod::Config mod_cfg;
+void populate_ofdm_cfgs(const OFDMTestConfig& cfg, sam::tx::OFDMMod::Config& mod_cfg, sam::rx::OFDMDemod::Config& dem_cfg) {
     mod_cfg.n_fft         = cfg.n_fft;
     mod_cfg.n_sc          = cfg.n_sc;
     mod_cfg.n_win         = cfg.n_win;
@@ -167,7 +147,6 @@ itpp::cvec run_ofdm_loopback(const OFDMTestConfig& cfg, const itpp::cvec& tx_inp
     mod_cfg.dft_precoding = cfg.is_lte;
     mod_cfg.dc            = cfg.is_lte;
 
-    sam::rx::OFDMDemod::Config dem_cfg;
     dem_cfg.n_fft         = cfg.n_fft;
     dem_cfg.n_sc          = cfg.n_sc;
     dem_cfg.cp            = cfg.cp;
@@ -177,14 +156,37 @@ itpp::cvec run_ofdm_loopback(const OFDMTestConfig& cfg, const itpp::cvec& tx_inp
     dem_cfg.fo            = cfg.fo;
     dem_cfg.to            = cfg.to;
     dem_cfg.gain          = cfg.gain;
+    dem_cfg.phase         = 0.0;
+}
+
+// =============================================================================
+// run_ofdm_loopback
+//
+// Parameters
+//   cfg      — all OFDM + channel parameters
+//   tx_input — input subcarrier bins, length must be N_SYM * cfg.n_sc
+//
+// Returns received signal
+// =============================================================================
+itpp::cvec run_ofdm_loopback(const OFDMTestConfig& cfg, const itpp::cvec& tx_input)
+{
+    const int sym_len   = cfg.n_fft + cfg.cp;
+    const int rx_sync   = static_cast<int>(cfg.to);
+
+    assert(static_cast<int>(tx_input.length()) == N_SYM * cfg.n_sc);
+
+    // --- Build mod / demod configs -------------------------------------------
+    sam::tx::OFDMMod::Config mod_cfg;
+    sam::rx::OFDMDemod::Config dem_cfg;
+    populate_ofdm_cfgs(cfg, mod_cfg, dem_cfg);
 
     sam::tx::OFDMMod   mod;
     sam::rx::OFDMDemod demod;
     sam::Control       ctrl;
 
-    itpp::cvec tx_waveform(n_sym * sym_len);
+    itpp::cvec tx_waveform(N_SYM * sym_len);
     itpp::cvec rx_waveform;
-    itpp::cvec rx_output(n_sym * cfg.n_sc);
+    itpp::cvec rx_output(N_SYM * cfg.n_sc);
     tx_waveform.zeros();
     rx_output.zeros();
 
@@ -196,7 +198,7 @@ itpp::cvec run_ofdm_loopback(const OFDMTestConfig& cfg, const itpp::cvec& tx_inp
     // =========================================================================
     // LOOP 1: Modulate
     // =========================================================================
-    for (int s = 0; s < n_sym; ++s)
+    for (int s = 0; s < N_SYM; ++s)
     {
         sam::ExecContext ctx;
         ctx.symbol_idx     = s;
@@ -204,7 +206,7 @@ itpp::cvec run_ofdm_loopback(const OFDMTestConfig& cfg, const itpp::cvec& tx_inp
         ctx.frame_idx      = 0;
         ctx.sample_count   = static_cast<uint64_t>(s) * sym_len;
         ctx.start_of_frame = (s == 0);
-        ctx.end_of_frame   = (s == n_sym - 1);
+        ctx.end_of_frame   = (s == N_SYM - 1);
 
         tx_sym.samples = tx_input.mid(s * cfg.n_sc, cfg.n_sc);
         mod_out.samples.zeros();
@@ -222,7 +224,7 @@ itpp::cvec run_ofdm_loopback(const OFDMTestConfig& cfg, const itpp::cvec& tx_inp
     // =========================================================================
     // LOOP 3: Demodulate (with integer time-offset compensation)
     // =========================================================================
-    for (int s = 0; s < n_sym; ++s)
+    for (int s = 0; s < N_SYM; ++s)
     {
         sam::ExecContext ctx;
         ctx.symbol_idx     = s;
@@ -230,7 +232,7 @@ itpp::cvec run_ofdm_loopback(const OFDMTestConfig& cfg, const itpp::cvec& tx_inp
         ctx.frame_idx      = 0;
         ctx.sample_count   = static_cast<uint64_t>(s) * sym_len;
         ctx.start_of_frame = (s == 0);
-        ctx.end_of_frame   = (s == n_sym - 1);
+        ctx.end_of_frame   = (s == N_SYM - 1);
 
         demod_in.samples.zeros();
         demod_out.samples.zeros();
@@ -260,7 +262,7 @@ int main()
 
     for (const auto& cfg : test_configs)
     {
-        itpp::cvec tx_input = itpp::randn_c(cfg.n_sym * cfg.n_sc);
+        itpp::cvec tx_input = itpp::randn_c(N_SYM * cfg.n_sc);
         itpp::cvec rx_output = run_ofdm_loopback(cfg, tx_input);
 
         itpp::cvec err = tx_input - rx_output;

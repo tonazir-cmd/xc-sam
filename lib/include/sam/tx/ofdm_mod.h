@@ -71,12 +71,12 @@ public:
     // -------------------------------------------------------------------------
     struct Config
     {
-        uint16_t n_fft  = 2048;   // IFFT size
-        uint16_t n_sc   = 1200;   // active subcarriers (must be ≤ n_fft)
-        uint16_t cp     = 144;    // cyclic prefix length [samples]
-        uint16_t n_win  = 0;      // windowing ramp length [samples]; 0 = none
-        bool     dft_precoding = false; // true for LTE
-        bool     dc = 0;         // true for LTE (null DC subcarrier)
+        uint16_t n_fft;     // IFFT size
+        uint16_t n_sc;      // active subcarriers (must be ≤ n_fft)
+        uint16_t cp;        // cyclic prefix length [samples]
+        uint16_t n_win;     // windowing ramp length [samples]; 0 = none
+        bool dft_precoding; // true for LTE
+        bool dc;            // true for LTE (null DC subcarrier)
     };
 
     // -------------------------------------------------------------------------

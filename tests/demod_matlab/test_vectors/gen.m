@@ -1,45 +1,60 @@
 clc; clear all; close all;
 
 %% — generate OFDM symbol with freq/timing offset and gain —
-function [rx_sym, txSym] = genOFDMSymbol(n_fft, n_sc, cp, gain, fo, Toff)
+function [rx_sym, txSym] = genOFDMSymbol(n_fft, n_sc, cp, gain, fo, Toff, n_sym)
     halfSc = n_sc/2;
+    
+    txSym_matrix = zeros(n_sc, n_sym);
+    txCP_total = zeros((n_fft + cp) * n_sym, 1);
 
-    % random QPSK
-    txSym = (2*randi([0,1],n_sc,1)-1) + ...
-            1j*(2*randi([0,1],n_sc,1)-1);
-    txSym = txSym / sqrt(2);
+    for k = 1:n_sym
+        % random QPSK for current symbol
+        sym_data = (2*randi([0,1],n_sc,1)-1) + ...
+                   1j*(2*randi([0,1],n_sc,1)-1);
+        sym_data = sym_data / sqrt(2);
+        
+        txSym_matrix(:, k) = sym_data;
 
-    % place in FFT bins
-    txFreq = zeros(n_fft,1);
-    txFreq(end-halfSc+1:end) = txSym(1:halfSc);
-    txFreq(1:halfSc)         = txSym(halfSc+1:end);
+        % place in FFT bins
+        txFreq = zeros(n_fft,1);
+        txFreq(end-halfSc+1:end) = sym_data(1:halfSc);
+        txFreq(1:halfSc)         = sym_data(halfSc+1:end);
 
-    % IFFT - no n_fft scaling, matches toolbox convention
-    txTime = ifft(txFreq);
+        % IFFT - no n_fft scaling, matches toolbox convention
+        txTime = ifft(txFreq);
 
-    % add CP
-    txCP   = [txTime(end-cp+1:end); txTime];
+        % add CP
+        txCP   = [txTime(end-cp+1:end); txTime];
+        
+        % Place in the overall time-domain array
+        idx_start = (k-1) * (n_fft + cp) + 1;
+        idx_end   = k * (n_fft + cp);
+        txCP_total(idx_start:idx_end) = txCP;
+    end
+    
+    % Flatten txSym into a single column vector for comparison
+    txSym = txSym_matrix(:);
 
     % apply gain
-    txCP   = txCP / gain;
+    txCP_total = txCP_total / gain;
 
-    % apply frequency offset
+    % apply frequency offset continuously across all symbols
     % matches C++: angle = 2*pi*fo*(n+Toff)
-    n      = (0:length(txCP)-1)';
-    txCP   = txCP .* exp(1j * 2 * pi * -fo .* (n + Toff));
+    n          = (0:length(txCP_total)-1)';
+    txCP_total = txCP_total .* exp(1j * 2 * pi * -fo .* (n + Toff));
 
-    rx_sym = single(txCP);
+    rx_sym = single(txCP_total);
 end
 
 %% — custom reference OFDMDemod ———————————————————————————
-function rxSym = OFDMDemod_ref(rx_signal, params)
+function rxSym = OFDMDemod_ref(rx_signal, params, n_sym)
     n_fft = double(params.n_fft);
     n_sc  = double(params.n_sc);
-    cp   = double(params.cp);
-    fo   = double(params.fo);
-    pos  = double(params.pos);
-    gain = double(params.gain);
-    lte = params.lte;
+    cp    = double(params.cp);
+    fo    = double(params.fo);
+    pos   = double(params.pos);
+    gain  = double(params.gain);
+    lte   = params.lte;
     
     if lte == 0
         dc = 0;
@@ -47,7 +62,6 @@ function rxSym = OFDMDemod_ref(rx_signal, params)
         dc = 1;
     end
 
-    % frequency correction - matches C++ and genOFDMSymbol
     n      = (0:length(rx_signal)-1)';
     phase  = 2.0*pi*(fo).*(n+pos);
     rx_rot = single(rx_signal) .* single(exp(1j*phase));
@@ -55,21 +69,32 @@ function rxSym = OFDMDemod_ref(rx_signal, params)
     % apply gain
     rx_rot = rx_rot * single(gain);
 
-    % CP fraction window
-    fftStart = fix(cp * 0.5);
-    symOff   = cp - fftStart;
-    part1    = rx_rot(cp+(1:n_fft-symOff));
-    part2    = rx_rot(cp-symOff+1:cp);
-    R_fft_in = [part1(:); part2(:)];
-
-    % FFT
-    R_fft = fft(R_fft_in);
-
-    % subcarrier extraction
+    rxSym = zeros(n_sc * n_sym, 1, 'single');
     halfSc = n_sc/2;
-    lower  = R_fft(end-halfSc+1:end);
-    upper  = R_fft(dc+1:halfSc+dc);
-    rxSym  = [lower(:); upper(:)];
+
+    for k = 1:n_sym
+        % Extract current symbol samples
+        idx_start = (k-1) * (n_fft + cp) + 1;
+        idx_end   = k * (n_fft + cp);
+        sym_samples = rx_rot(idx_start:idx_end);
+
+        % CP fraction window
+        fftStart = fix(cp * 0.5);
+        symOff   = cp - fftStart;
+        part1    = sym_samples(cp+(1:n_fft-symOff));
+        part2    = sym_samples(cp-symOff+1:cp);
+        R_fft_in = [part1(:); part2(:)];
+
+        % FFT
+        R_fft = fft(R_fft_in);
+
+        % subcarrier extraction
+        lower = R_fft(end-halfSc+1:end);
+        upper = R_fft(dc+1:halfSc+dc);
+        
+        % Place into flattened rx array
+        rxSym((k-1)*n_sc + 1 : k*n_sc) = [lower(:); upper(:)];
+    end
 end
 
 function write_config(params, filename)
@@ -131,6 +156,7 @@ configs = {
 gainList = [1.0, 2.0, 0.5];          % rx gain
 foHzList = [0, 100, -100];           % freq offset Hz
 ToffList = [0, 5, 10];               % timing offset samples
+n_sym    = 14;                       % Number of symbols (1 slot)
 
 %% — size dependent threshold —————————————————————————————
 threshMap = containers.Map(...
@@ -150,8 +176,8 @@ fprintf('%s\n', repmat('-',1,75));
 for i = 1:size(configs,1)
     n_fft  = configs{i,1};
     n_sc   = configs{i,2};
-    cp    = configs{i,3};
-    scs   = configs{i,4};
+    cp     = configs{i,3};
+    scs    = configs{i,4};
     thresh = threshMap(n_fft);
     fs     = scs * 1e3 * n_fft;  % sample rate Hz
 
@@ -163,10 +189,10 @@ for i = 1:size(configs,1)
     fo_normalized = fo_hz / fs;
     testIdx = testIdx + 1;
 
-    % — generate symbol ———————————————————————
+    % — generate 14 symbols —————————————————————
     [rx_sym, txSym] = genOFDMSymbol(...
         n_fft, n_sc, cp, gain, ...
-        fo_normalized, Toff);
+        fo_normalized, Toff, n_sym);
 
     % — params ————————————————————————————————
     params.lte    = 0;
@@ -174,7 +200,7 @@ for i = 1:size(configs,1)
     params.n_fft  = double(n_fft);
     params.n_sc   = double(n_sc);
     params.cp     = double(cp);
-    params.fo_hz  = double(fo_hz)
+    params.fo_hz  = double(fo_hz);
     params.fo     = double(fo_normalized);
     params.pos    = double(Toff);
     params.Toff   = double(Toff);
@@ -183,7 +209,7 @@ for i = 1:size(configs,1)
 
     % — custom reference ——————————————————————
     try
-        refSym = OFDMDemod_ref(rx_sym, params);
+        refSym = OFDMDemod_ref(rx_sym, params, n_sym);
     catch e
         fprintf('REF ERR n_fft=%d: %s\n', n_fft, e.message);
         nFail = nFail+1; continue;
@@ -219,7 +245,7 @@ for i = 1:size(configs,1)
 
         write_config(params, configPath);
         write_complex_bin(rx_sym, inputPath);
-        write_complex_bin(refSym, refPath);
+        write_complex_bin(txSym, refPath);
     end
 end
 

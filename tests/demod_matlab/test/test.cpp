@@ -13,6 +13,7 @@
 #include <cassert>
 
 #include "config.h"
+#include "sam/core/constants.h"
 #include "sam/core/signal_types.h"
 #include "sam/rx/ofdm_demod.h"
 
@@ -65,15 +66,7 @@ int main() {
 
         // 2. Derive Parameters
         const int sym_len = my_cfg.n_fft + my_cfg.cp;
-        
-        // Calculate number of symbols based on input file size and time offset
-        int n_sym = (input_samples.length()) / sym_len;
-        
-        if (n_sym <= 0 || (input_samples.length()) % sym_len != 0) {
-            printf("Error: Input length doesn't cleanly match an integer number of symbols based on N_FFT, and CP.\n");
-            return 1;
-        }
-
+        std::cout << input_samples.length() << " input samples loaded.\n";
         // Calculate sample rate: SCS (kHz) * 1000 * N_FFT
         double sample_rate = static_cast<double>(my_cfg.scs) * 1e3 * my_cfg.n_fft;
 
@@ -92,7 +85,7 @@ int main() {
         sam::rx::OFDMDemod demod;
         sam::Control       ctrl;
 
-        itpp::cvec rx_output(n_sym * my_cfg.n_sc);
+        itpp::cvec rx_output(N_SYM * my_cfg.n_sc);
         rx_output.zeros();
 
         sam::SignalData demod_in, demod_out;
@@ -100,14 +93,14 @@ int main() {
         demod_out.samples.set_size(my_cfg.n_sc, false);
 
         // 4. Run the Demodulator Symbol-by-Symbol
-        for (int s = 0; s < n_sym; ++s) {
+        for (int s = 0; s < N_SYM; ++s) {
             sam::ExecContext ctx;
             ctx.symbol_idx     = s;
             ctx.slot_idx       = 0;
             ctx.frame_idx      = 0;
             ctx.sample_count   = static_cast<uint64_t>(s) * sym_len;
             ctx.start_of_frame = (s == 0);
-            ctx.end_of_frame   = (s == n_sym - 1);
+            ctx.end_of_frame   = (s == N_SYM - 1);
 
             demod_in.samples.zeros();
             demod_out.samples.zeros();

@@ -22,18 +22,18 @@ public:
 
     struct Config
     {
-        uint16_t n_fft         = 2048;
-        uint16_t n_sc          = 1200;
-        uint16_t cp            = 144;
-        bool     dft_precoding = false; // true for LTE
+        uint16_t n_fft;
+        uint16_t n_sc;
+        uint16_t cp;
+        bool dft_precoding; // true for LTE
 
         // Front-end signal correction parameters
-        bool     dc            = false;   // enable dc subcarrier nulling (true for LTE)
-        double   phase         = 0.0;     // static phase rotation (radians)
-        double   fo            = 0.0;     // frequency offset (Hz)
-        size_t   to            = 0;       // time offset (samples) for time delay compensation  
-        double   gain          = 1.0;     // amplitude scaling gain
-        double   sample_rate   = 30.72e6; // sample rate (Hz)
+        bool dc;            // enable dc subcarrier nulling (true for LTE)
+        double phase;       // static phase rotation (radians)
+        double fo;          // frequency offset (Hz)
+        size_t to;           // time offset (samples) for time delay compensation  
+        double gain;        // amplitude scaling gain
+        double sample_rate; // sample rate (Hz)
     };
 
     OFDMDemod() = default;
