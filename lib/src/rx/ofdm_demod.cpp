@@ -61,14 +61,22 @@ itpp::cvec OFDMDemod::apply_front_end_corrections_(const itpp::cvec& in_samples,
 {
     // val * gain * exp(j * (2 * pi * f_o * t + phase))
     
-    const double ts = 1.0 / cfg.sample_rate;
-    
-    size_t start_idx = ctx.sample_count + cfg.cp + cfg.to; // compensate time offset
-    size_t end_idx = start_idx + cfg.n_fft - 1;
-    itpp::vec t = itpp::linspace(start_idx, end_idx, cfg.n_fft) * ts;
-    itpp::vec theta = (2.0 * itpp::pi * cfg.fo * t) + cfg.phase;
-    itpp::cvec correction = cfg.gain * itpp::exp(std::complex<double>(0, 1) * theta);
-    return itpp::elem_mult(in_samples.mid(cfg.cp, cfg.n_fft), correction);
+    const size_t num_samples = in_samples.length();
+    const double global_history_phase = cfg.fo * ctx.sample_count;
+
+    itpp::vec indices = itpp::linspace(0, num_samples - 1, num_samples);
+    itpp::vec total_phase_offset = (cfg.fo * indices) + global_history_phase + cfg.phase;
+    itpp::cvec phasor_correction = cfg.gain * itpp::exp(std::complex<double>(0, 1) * (itpp::m_2pi * total_phase_offset));
+    itpp::cvec rotated_samples = itpp::elem_mult(in_samples, phasor_correction);
+
+    // To be removed // added when windowing method is decided
+    if (cfg.curr_sym_windowing) return rotated_samples.mid(cfg.cp, cfg.n_fft);
+
+    itpp::cvec output(cfg.n_fft);
+    const size_t half_cp = cfg.cp / 2;
+    output.set_subvector(0, rotated_samples.mid(cfg.cp, cfg.n_fft - half_cp));
+    output.set_subvector(cfg.n_fft - half_cp, rotated_samples.mid(half_cp, half_cp));
+    return output;
 }
 
 itpp::cvec OFDMDemod::extract_subcarriers_(const itpp::cvec& fft_out,

@@ -25,15 +25,16 @@ public:
         uint16_t n_fft;
         uint16_t n_sc;
         uint16_t cp;
-        bool dft_precoding; // true for LTE
+        bool dft_precoding; // enable idft decoding
 
         // Front-end signal correction parameters
-        bool dc;            // enable dc subcarrier nulling (true for LTE)
-        double phase;       // static phase rotation (radians)
-        double fo;          // frequency offset (Hz)
-        size_t to;           // time offset (samples) for time delay compensation  
-        double gain;        // amplitude scaling gain
-        double sample_rate; // sample rate (Hz)
+        bool dc;      // enable dc subcarrier nulling (true for LTE)
+        double phase; // normalized static phase rotation
+        double fo;    // normalized frequency offset
+        double gain;  // amplitude scaling gain
+
+        // Temp var, will be removed once windowing method is decided
+        bool curr_sym_windowing = false;
     };
 
     OFDMDemod() = default;

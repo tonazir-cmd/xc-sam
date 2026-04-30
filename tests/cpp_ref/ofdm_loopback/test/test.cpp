@@ -152,11 +152,10 @@ void populate_ofdm_cfgs(const OFDMTestConfig& cfg, sam::tx::OFDMMod::Config& mod
     dem_cfg.cp            = cfg.cp;
     dem_cfg.dc            = cfg.is_lte;
     dem_cfg.dft_precoding = cfg.is_lte;
-    dem_cfg.sample_rate   = cfg.sample_rate;
-    dem_cfg.fo            = cfg.fo;
-    dem_cfg.to            = cfg.to;
+    dem_cfg.fo            = cfg.fo / cfg.sample_rate; // normalized
     dem_cfg.gain          = cfg.gain;
     dem_cfg.phase         = 0.0;
+    dem_cfg.curr_sym_windowing = true;
 }
 
 // =============================================================================
@@ -171,7 +170,6 @@ void populate_ofdm_cfgs(const OFDMTestConfig& cfg, sam::tx::OFDMMod::Config& mod
 itpp::cvec run_ofdm_loopback(const OFDMTestConfig& cfg, const itpp::cvec& tx_input)
 {
     const int sym_len   = cfg.n_fft + cfg.cp;
-    const int rx_sync   = static_cast<int>(cfg.to);
 
     assert(static_cast<int>(tx_input.length()) == N_SYM * cfg.n_sc);
 
@@ -230,15 +228,14 @@ itpp::cvec run_ofdm_loopback(const OFDMTestConfig& cfg, const itpp::cvec& tx_inp
         ctx.symbol_idx     = s;
         ctx.slot_idx       = 0;
         ctx.frame_idx      = 0;
-        ctx.sample_count   = static_cast<uint64_t>(s) * sym_len;
+        ctx.sample_count   = (static_cast<uint64_t>(s) * sym_len) + cfg.to;
         ctx.start_of_frame = (s == 0);
         ctx.end_of_frame   = (s == N_SYM - 1);
 
         demod_in.samples.zeros();
         demod_out.samples.zeros();
 
-        int start_idx = rx_sync + s * sym_len;
-        demod_in.samples = rx_waveform.mid(start_idx, sym_len);
+        demod_in.samples = rx_waveform.mid(ctx.sample_count, sym_len);
 
         demod.eval(demod_in, demod_out, ctrl, dem_cfg, ctx);
         rx_output.set_subvector(s * cfg.n_sc, demod_out.samples);
