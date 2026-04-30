@@ -1,7 +1,7 @@
 #include "sam/core/constants.h"
 #include "sam/core/signal_types.h"
 #include "sam/rx/ofdm_demod.h"
-#include "sam/debug/utils.h"
+#include "sam/utils/vec_io.h"
 
 #include <itpp/itbase.h>
 #include <itpp/fixed/cfix.h>

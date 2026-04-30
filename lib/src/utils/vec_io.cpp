@@ -1,4 +1,4 @@
-#pragma once
+#include "sam/utils/vec_io.h"
 
 #include <iostream>
 #include <fstream>
@@ -13,7 +13,7 @@
     } while (false)
 
 
-static itpp::cvec read_sc16_as_cvec(const std::string& filename, size_t fix_point, size_t num_samples = 0) {
+itpp::cvec read_sc16_as_cvec(const std::string& filename, size_t fix_point, size_t num_samples) {
     THROW_ERROR(fix_point > 15, "fix_point must be in [0, 15] for int16.");
 
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
@@ -42,7 +42,7 @@ static itpp::cvec read_sc16_as_cvec(const std::string& filename, size_t fix_poin
     return out_vec;
 }
 
-static void save_cvec_as_complex128(const itpp::cvec& vec, const std::string& filename) {
+void save_cvec_as_complex128(const itpp::cvec& vec, const std::string& filename) {
     std::ofstream outfile(filename, std::ios::binary | std::ios::app);    
     THROW_ERROR(!outfile.is_open(), "Could not open file " + filename + " for writing/appending.");
 
