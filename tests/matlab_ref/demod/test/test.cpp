@@ -25,62 +25,55 @@
 #include <vector>
 #include <complex>
 
+struct TestParams
+{
+    std::vector<int> cp_array;
+    size_t t_off;
+    std::string input_bin;
+    std::string reference_bin;
+    sam::rx::OFDMDemod::Config demod_config;
+};
+
+TestParams get_test_params(TestArgs args);
+
 int main(int argc, char* argv[]) {
     TestArgs args = ArgsParser::parse(argc, argv);
 
     std::cout << "\n--- DEMOD Test ---\n";
-    std::cout << "Mode:      " << args.mode_str << "\n";
-    std::cout << "Channel:   " << args.channel_str << "\n";
-    std::cout << "Bandwidth: " << args.bandwidth_str << " MHz\n";
-    std::cout << "FilePath:  " << args.toVectorsDir("../test_vectors") << "\n\n";
-    const std::string test_vector_dir = args.toVectorsDir("../test_vectors");
-    const std::string input_params_txt = test_vector_dir + "lte_input_params.txt";
-    const std::string rx_demod_input_bin = test_vector_dir + "lte_time1_input_rx_signal0.bin";
-    const std::string rx_demod_reference_bin = test_vector_dir + "lte_time1_output_rxSubframe.bin";
+    std::cout << args;
 
-    LTEPdschParams params = LTEPdschParamsLoader::load(input_params_txt);
+    TestParams params = get_test_params(args);
+    sam::rx::OFDMDemod::Config& demod_config = params.demod_config;
 
-    const std::vector<int> cp_array = params.Ncp;
-    const size_t t_off = params.TimingOffset;
-    const float rx_gain = 4.0;
-
-    sam::rx::OFDMDemod::Config dem_cfg;
-    dem_cfg.n_fft         = params.nFFT;
-    dem_cfg.n_sc          = params.Nsc;
-    dem_cfg.cp            = cp_array[0];
-    dem_cfg.dc            = (args.mode == Mode::LTE);
-    dem_cfg.dft_precoding = false;
-    dem_cfg.fo            = (params.FreqOffset == 0.007812f)? 0.0078125 : params.FreqOffset;
-    dem_cfg.gain          = rx_gain;
-
-    itpp::cvec input = read_sc16_as_cvec(rx_demod_input_bin, 15);
+    itpp::cvec input = read_sc16_as_cvec(params.input_bin, 15);
 
     sam::rx::OFDMDemod demod;
     sam::Control ctrl;
     sam::ExecContext ctx{0};
     sam::SignalData demod_in, demod_out;
 
-    itpp::cvec output(dem_cfg.n_sc * N_SYM);
-    ctx.sample_count = t_off;
-    demod_out.samples.set_size(dem_cfg.n_sc);
+    itpp::cvec output(demod_config.n_sc * N_SYM);
+    ctx.sample_count = params.t_off;
+    demod_out.samples.set_size(demod_config.n_sc);
 
     for (size_t sym_idx = 0; sym_idx < N_SYM; sym_idx++) {
-        dem_cfg.cp = cp_array[sym_idx];
+        demod_config.cp = params.cp_array[sym_idx];
         ctx.symbol_idx = sym_idx;
-        int sym_len = dem_cfg.n_fft + dem_cfg.cp;
+        int sym_len = demod_config.n_fft + demod_config.cp;
 
         demod_in.samples = input.mid(ctx.sample_count, sym_len);
-        demod.eval(demod_in, demod_out, ctrl, dem_cfg, ctx);
-        output.set_subvector(sym_idx * dem_cfg.n_sc, demod_out.samples);
+        demod.eval(demod_in, demod_out, ctrl, demod_config, ctx);
+        output.set_subvector(sym_idx * demod_config.n_sc, demod_out.samples);
 
         ctx.sample_count += sym_len;
     }
 
-    itpp::cvec reference = read_sc16_as_cvec(rx_demod_reference_bin, 7);
+    itpp::cvec reference = read_sc16_as_cvec(params.reference_bin, 8);
 
     double mse = itpp::mean(itpp::abs(output - reference));
     double snr = 20 * std::log10(itpp::mean(itpp::abs(reference)) / mse);
 
+    std::cout << "\n--- Result ---\n";
     std::cout << "MSE: " << mse << "\n";
     std::cout << "SNR: " << snr << "\n";
     
@@ -90,4 +83,53 @@ int main(int argc, char* argv[]) {
     }
 
     return 0;
+}
+
+TestParams get_test_params(TestArgs args)
+{
+    TestParams params;
+    if (args.mode == Mode::LTE)
+    {
+        const std::string test_vector_dir = args.toVectorsDir("../test_vectors");
+        std::cout << "Test Vector Dir: " << test_vector_dir << "\n";
+        
+        const std::string input_params_txt = test_vector_dir + "lte_input_params.txt";
+        LTEPdschParams lte_params = LTEPdschParamsLoader::load(input_params_txt);
+            
+        params.input_bin = test_vector_dir + "lte_time1_input_rx_signal0.bin";
+        params.reference_bin = test_vector_dir + "lte_time1_output_rxSubframe.bin";
+        params.t_off = lte_params.TimingOffset;
+        params.cp_array = lte_params.Ncp;
+
+        params.demod_config.n_fft = lte_params.nFFT;
+        params.demod_config.n_sc = lte_params.Nsc;
+        params.demod_config.cp = params.cp_array[0];
+        params.demod_config.fo = (lte_params.FreqOffset == 0.007812f)? 0.0078125 : lte_params.FreqOffset;
+        params.demod_config.gain = 4.0;
+        params.demod_config.phase = 0;
+        params.demod_config.dc = true;
+        params.demod_config.dft_precoding = false;
+    }
+    else if (args.mode == Mode::NR5G)
+    {
+        const std::string test_vector_dir = args.toVectorsDir("../test_vectors");
+        std::cout << "Test Vector Dir: " << test_vector_dir << "\n";
+
+        params.input_bin = test_vector_dir + "5g_input_rx_signal0.bin";
+        params.reference_bin = test_vector_dir + "5g_output_rxSubframe.bin";
+        params.t_off = 0;
+        params.cp_array = {544, 288, 288, 288, 288, 288, 288, 288, 288, 288, 288, 288, 288, 288};
+        
+        params.demod_config.n_fft = 4096;
+        params.demod_config.n_sc = 3300;
+        params.demod_config.cp = params.cp_array[0];
+        params.demod_config.fo = 0.0;
+        params.demod_config.gain = 1.0;
+        params.demod_config.phase = 0;
+        params.demod_config.dc = false;
+        params.demod_config.dft_precoding = false;
+    }
+    
+
+    return params;
 }

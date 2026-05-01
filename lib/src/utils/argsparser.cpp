@@ -30,6 +30,17 @@ std::string toString(Bandwidth b) {
     return "";
 }
 
+std::string toString(DMRSMode m) {
+    switch (m) {
+        case DMRSMode::Mode1: return "1";
+        case DMRSMode::Mode2: return "2";
+        case DMRSMode::Mode3: return "3";
+        case DMRSMode::Mode4: return "4";
+        case DMRSMode::Mode5: return "5";
+    }
+    return "";
+}
+
 // --- Static Map Initializations ----------------------------------------------
 
 const std::unordered_map<std::string, Mode> ArgsParser::kModeMap = {
@@ -51,6 +62,14 @@ const std::unordered_map<std::string, Bandwidth> ArgsParser::kBandwidthMap = {
     {"20", Bandwidth::BW_20},
 };
 
+const std::unordered_map<std::string, DMRSMode> ArgsParser::kDMRSModeMap = {
+    {"1", DMRSMode::Mode1},
+    {"2", DMRSMode::Mode2},
+    {"3", DMRSMode::Mode3},
+    {"4", DMRSMode::Mode4},
+    {"5", DMRSMode::Mode5},
+};
+
 // --- ArgsParser implementation -----------------------------------------------
 
 std::pair<std::string, std::string> ArgsParser::splitArg(const std::string& arg) {
@@ -69,6 +88,7 @@ TestArgs ArgsParser::parse(int argc, char* argv[]) {
     std::string modeStr      = "lte";
     std::string channelStr   = "pdsch";
     std::string bandwidthStr = "20";
+    std::string dmrs_modeStr = "1";
 
     for (int i = 1; i < argc; ++i) {
         auto argPair = splitArg(argv[i]);
@@ -78,6 +98,7 @@ TestArgs ArgsParser::parse(int argc, char* argv[]) {
         if      (key == "mode")      modeStr      = val;
         else if (key == "channel")   channelStr   = val;
         else if (key == "bandwidth") bandwidthStr = val;
+        else if (key == "dmrs-mode") dmrs_modeStr = val;
         else
             throw std::invalid_argument("Unknown argument: --" + key);
     }
@@ -86,8 +107,10 @@ TestArgs ArgsParser::parse(int argc, char* argv[]) {
         lookupEnum("mode",      modeStr,      kModeMap),
         lookupEnum("channel",   channelStr,   kChannelMap),
         lookupEnum("bandwidth", bandwidthStr, kBandwidthMap),
+        lookupEnum("dmrs-mode", dmrs_modeStr, kDMRSModeMap),
         modeStr,
         channelStr,
-        bandwidthStr
+        bandwidthStr,
+        dmrs_modeStr
     };
 }
