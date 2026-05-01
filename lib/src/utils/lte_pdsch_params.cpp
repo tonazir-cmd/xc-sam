@@ -25,6 +25,14 @@ LTEPdschParams LTEPdschParamsLoader::load(const std::string& filepath) {
 
     // ---- Cyclic prefix: integer samples ----
     out.Ncp = p.getArray<int>("Ncp");
+    if (out.Ncp.size() * 2 == static_cast<size_t>(out.Nsym))
+    {
+        out.Ncp.reserve(out.Ncp.size() * 2);
+        out.Ncp.insert(out.Ncp.end(), out.Ncp.begin(), out.Ncp.end());
+    }
+
+    if (out.Ncp.size() != static_cast<size_t>(out.Nsym))
+        std::runtime_error("Ncp size does not match Nsym or Nsym / 2");
 
     // ---- TX scheme / DCI format: ASCII float arrays -> string ----
     out.TXScheme  = asciiVecToString(p.getArray<float>("TXScheme"));

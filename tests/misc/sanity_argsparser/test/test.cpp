@@ -5,7 +5,7 @@
 
 int main(int argc, char* argv[]) {
     try {
-        TestConfig cfg = ArgsParser::parse(argc, argv);
+        TestArgs cfg = ArgsParser::parse(argc, argv);
 
         std::cout << "--- Enum Access ---\n";
         std::cout << "Mode Enum ID:  " << static_cast<int>(cfg.mode) << "\n";

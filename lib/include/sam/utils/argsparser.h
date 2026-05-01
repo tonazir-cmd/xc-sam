@@ -20,7 +20,7 @@ std::string toString(Bandwidth b);
 
 // --- Config struct -----------------------------------------------------------
 
-struct TestConfig {
+struct TestArgs {
     // Enum values
     Mode      mode;
     Channel   channel;
@@ -70,5 +70,5 @@ private:
     }
 
 public:
-    static TestConfig parse(int argc, char* argv[]);
+    static TestArgs parse(int argc, char* argv[]);
 };

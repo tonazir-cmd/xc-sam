@@ -64,7 +64,7 @@ std::pair<std::string, std::string> ArgsParser::splitArg(const std::string& arg)
     return { arg.substr(2, eq - 2), arg.substr(eq + 1) };
 }
 
-TestConfig ArgsParser::parse(int argc, char* argv[]) {
+TestArgs ArgsParser::parse(int argc, char* argv[]) {
     // Defaults
     std::string modeStr      = "lte";
     std::string channelStr   = "pdsch";
@@ -82,7 +82,7 @@ TestConfig ArgsParser::parse(int argc, char* argv[]) {
             throw std::invalid_argument("Unknown argument: --" + key);
     }
 
-    return TestConfig{
+    return TestArgs{
         lookupEnum("mode",      modeStr,      kModeMap),
         lookupEnum("channel",   channelStr,   kChannelMap),
         lookupEnum("bandwidth", bandwidthStr, kBandwidthMap),
