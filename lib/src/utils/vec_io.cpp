@@ -1,4 +1,4 @@
-#include "sam/utils/vec_io.h"
+#include "sam/utils/vec_io.hpp"
 
 #include <iostream>
 #include <fstream>

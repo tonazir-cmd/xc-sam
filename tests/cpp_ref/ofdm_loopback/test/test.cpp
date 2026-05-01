@@ -3,10 +3,10 @@
 // Extracted inner loopback into run_ofdm_loopback(); main sweeps test_configs.
 // =============================================================================
 
-#include "sam/core/constants.h"
-#include "sam/core/signal_types.h"
-#include "sam/tx/ofdm_mod.h"
-#include "sam/rx/ofdm_demod.h"
+#include "sam/core/constants.hpp"
+#include "sam/core/signal_types.hpp"
+#include "sam/tx/ofdm_mod.hpp"
+#include "sam/rx/ofdm_demod.hpp"
 
 #include <itpp/itbase.h>
 

@@ -1,4 +1,4 @@
-#include "sam/utils/params_reader.h"
+#include "sam/utils/params_reader.hpp"
 #include <fstream>
 #include <iostream>
 

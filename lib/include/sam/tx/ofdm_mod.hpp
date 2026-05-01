@@ -28,8 +28,8 @@
 
 #pragma once
 
-#include "sam/core/base.h"
-#include "sam/core/signal_types.h"
+#include "sam/core/base.hpp"
+#include "sam/core/signal_types.hpp"
 
 #include <itpp/itbase.h>
 

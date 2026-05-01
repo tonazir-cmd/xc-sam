@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include "sam/core/base.h"
+#include "sam/core/base.hpp"
 
 #include <itpp/itbase.h>    // itpp::vec, itpp::cvec
 

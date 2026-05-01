@@ -1,5 +1,5 @@
 #include <iostream>
-#include "sam/utils/argsparser.h"
+#include "sam/utils/argsparser.hpp"
 
 // --- Usage example -----------------------------------------------------------
 

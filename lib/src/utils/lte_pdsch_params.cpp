@@ -1,4 +1,4 @@
-#include "sam/utils/lte_pdsch_params.h"
+#include "sam/utils/lte_pdsch_params.hpp"
 
 std::string LTEPdschParamsLoader::asciiVecToString(const std::vector<float>& v) {
     std::string s;

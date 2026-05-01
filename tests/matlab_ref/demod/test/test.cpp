@@ -1,9 +1,9 @@
-#include "sam/core/constants.h"
-#include "sam/core/signal_types.h"
-#include "sam/rx/ofdm_demod.h"
-#include "sam/utils/vec_io.h"
-#include "sam/utils/argsparser.h"
-#include "sam/utils/lte_pdsch_params.h"
+#include "sam/core/constants.hpp"
+#include "sam/core/signal_types.hpp"
+#include "sam/rx/ofdm_demod.hpp"
+#include "sam/utils/vec_io.hpp"
+#include "sam/utils/argsparser.hpp"
+#include "sam/utils/lte_pdsch_params.hpp"
 
 #include <itpp/itbase.h>
 #include <itpp/fixed/cfix.h>

@@ -3,7 +3,7 @@
 // Xcelerium SAM Framework — OFDMMod Implementation
 // =============================================================================
 
-#include "sam/tx/ofdm_mod.h"
+#include "sam/tx/ofdm_mod.hpp"
 
 #include <itpp/signal/transforms.h> // itpp::ifft, itpp::fft
 #include <itpp/base/vec.h>

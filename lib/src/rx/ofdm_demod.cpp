@@ -1,4 +1,4 @@
-#include "sam/rx/ofdm_demod.h"
+#include "sam/rx/ofdm_demod.hpp"
 
 #include <itpp/signal/transforms.h>
 #include <itpp/base/vec.h>

@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
-#include "sam/utils/params_reader.h"
+#include "sam/utils/params_reader.hpp"
 
 struct LTEPdschParams {
     // ---- Grid / dimensions ----
