@@ -15,29 +15,65 @@ implementation reference targeting SDR platforms.
 │   ├── Makefile
 │   ├── bin/
 │   │   └── sam/
-│   │       └── libsam.a
+│   │       ├── libsam.a
+│   │       └── obj/
+│   │           ├── rx/
+│   │           ├── tx/
+│   │           └── utils/
 │   ├── include/
 │   │   └── sam/
 │   │       ├── core/
 │   │       │   ├── base.h
+│   │       │   ├── constants.h
 │   │       │   ├── fx_utils.h
 │   │       │   └── signal_types.h
 │   │       ├── rx/
 │   │       │   └── ofdm_demod.h
-│   │       └── tx/
-│   │           └── ofdm_mod.h
+│   │       ├── tx/
+│   │       │   └── ofdm_mod.h
+│   │       └── utils/
+│   │           ├── argsparser.h
+│   │           ├── lte_pdsch_params.h
+│   │           └── params_reader.h
 │   └── src/
 │       ├── rx/
 │       │   └── ofdm_demod.cpp
-│       └── tx/
-│           └── ofdm_mod.cpp
-└── tests/
-    └── ofdm_loopback/
-        ├── Makefile
-        ├── bin/
-        │   └── test.exe
-        └── test/
-            └── test.cpp
+│       ├── tx/
+│       │   └── ofdm_mod.cpp
+│       └── utils/
+│           ├── argsparser.cpp
+│           ├── lte_pdsch_params.cpp
+│           └── params_reader.cpp
+├── matlab/
+├── tests/
+│   ├── cpp_ref/
+│   │   └── ofdm_loopback/
+│   │       ├── Makefile
+│   │       ├── bin/
+│   │       │   └── test.exe
+│   │       └── test/
+│   │           └── test.cpp
+│   ├── matlab_ref/
+│   │   └── demod/
+│   │       ├── Makefile
+│   │       ├── bin/
+│   │       │   └── test.exe
+│   │       └── test/
+│   │           └── test.cpp
+│   └── misc/
+│       ├── sanity_argsparser/
+│       │   ├── Makefile
+│       │   ├── bin/
+│       │       │   └── test.exe
+│       │       └── test/
+│       │           └── test.cpp
+│       └── sanity_lte_pdsch_params/
+│           ├── Makefile
+│           ├── params.txt
+│           ├── bin/
+│           │   └── test.exe
+│           └── test/
+│           └── test.cpp
 ```
 
 ## Build
@@ -75,10 +111,46 @@ lib/bin/sam/libsam.a
 ### Tests
 
 ```bash
-cd tests/ofdm_loopback/
+# Build and run OFDM loopback test
+cd tests/cpp_ref/ofdm_loopback/
 make
 ./bin/test.exe
+
+# Build and run demod test
+cd tests/matlab_ref/demod/
+make
+./bin/test.exe --mode=lte --channel=pdsch --bandwidth=20
+
+# Build and run argsparser sanity test
+cd tests/misc/sanity_argsparser/
+make
+./bin/test.exe --mode=5g --channel=pbch --bandwidth=10
 ```
+
+---
+
+## Usage
+
+### Running Demodulation Tests
+
+The demodulation test (`tests/matlab_ref/demod/`) validates the OFDM demodulation against MATLAB reference vectors. It requires test vector files in a specific directory structure.
+
+#### Command-line Arguments for Demod
+
+The demod test accepts the following arguments:
+
+* `--mode`: Communication standard (`lte` or `5g`)
+* `--channel`: Channel type (`pdsch`, `pbch`, or `pdcch`)
+* `--bandwidth`: (for lte) Bandwidth in MHz (`3`, `5`, `10`, `15`, or `20`)
+* `--dmrs_mode`: (for 5g) Dmrs mode (`1`, `2`, `3`, `4`, or `5`)
+
+Example usage:
+
+```bash
+./bin/test.exe --mode=lte --channel=pdsch --bandwidth=20
+```
+
+This will look for test vectors in `../test_vectors/lte/pdsch/20MHz/` relative to the test directory.
 
 ---
 
