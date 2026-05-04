@@ -19,18 +19,19 @@ public:
     using Inputs  = SignalData;  // Received frequency-domain subcarriers (n_sc)
     using Outputs = SignalData;  // Estimated channel response H (n_sc)
 
-    // Strongly typed enum for DMRS Comb configuration
-    enum class CombPattern : uint8_t
+    // Strongly typed enum for DMRS Pattern configuration
+    enum class DMRSPattern : uint8_t
     {
         Even = 0,
         Odd  = 1
     };
 
+    // TODO: See if we require dmrs_symbol_indices to identify if a symbol is dmrs or not (for 5g)
     struct Config
     {
         uint16_t    n_sc;
-        CombPattern dmrs_comb;   // Explicitly defines the comb offset
-        itpp::cvec  dmrs_seq;    // Known transmitted DMRS sequence
+        DMRSPattern dmrs_pattern;
+        itpp::cvec  dmrs_seq;
     };
 
     ChannelEstimator() = default;
@@ -59,21 +60,28 @@ private:
     itpp::cvec ls_estimate_(const itpp::cvec& rx_grid, 
                             const itpp::cvec& tx_dmrs, 
                             uint16_t n_sc, 
-                            CombPattern comb);
+                            DMRSPattern dmrs_pattern);
+
+    // -------------------------------------------------------------------------
+    // average_adjacent_pilots_()
+    // Averages adjacent pilot pairs to reduce independent noise variance by half 
+    //
+    // -------------------------------------------------------------------------
+    void average_adjacent_pilots_(itpp::cvec& hest, uint16_t n_sc, DMRSPattern dmrs_pattern);
 
     // -------------------------------------------------------------------------
     // interpolate_()
     // Linearly interpolates the channel estimates for non-pilot subcarriers.
     //
     // -------------------------------------------------------------------------
-    void interpolate_(itpp::cvec& hest, uint16_t n_sc, CombPattern comb);
+    void interpolate_(itpp::cvec& hest, uint16_t n_sc, DMRSPattern dmrs_pattern);
 
     // -------------------------------------------------------------------------
     // extrapolate_edges_()
     // Linearly extrapolates the channel response for edge subcarriers.
     //
     // -------------------------------------------------------------------------
-    void extrapolate_edges_(itpp::cvec& hest, uint16_t n_sc, CombPattern comb);
+    void extrapolate_edges_(itpp::cvec& hest, uint16_t n_sc, DMRSPattern dmrs_pattern);
 };
 
 } // namespace rx

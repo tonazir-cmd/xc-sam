@@ -28,9 +28,7 @@ void OFDMDemod::eval(const Inputs&      in,
     // -------------------------------------------------------------------------
     assert(cfg.n_sc % 12 == 0);
     assert(cfg.n_sc <= cfg.n_fft);
-
     assert(in.samples.size() == cfg.n_fft + cfg.cp);
-    assert(out.samples.size() == cfg.n_sc);
 
     // -------------------------------------------------------------------------
     // Processing

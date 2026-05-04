@@ -1,4 +1,6 @@
 #include "sam/utils/argsparser.hpp"
+#include <iostream>
+#include <cstdlib>
 
 // --- toString helpers implementation -----------------------------------------
 
@@ -83,34 +85,54 @@ std::pair<std::string, std::string> ArgsParser::splitArg(const std::string& arg)
     return { arg.substr(2, eq - 2), arg.substr(eq + 1) };
 }
 
-TestArgs ArgsParser::parse(int argc, char* argv[]) {
-    // Defaults
-    std::string modeStr      = "lte";
-    std::string channelStr   = "pdsch";
-    std::string bandwidthStr = "20";
-    std::string dmrs_modeStr = "1";
+void ArgsParser::printHelp() {
+    std::cout << "Usage: program [OPTIONS]\n\n"
+              << "Options:\n"
+              << "  --help, -h          Print this help message\n"
+              << "  --mode=VAL          Set mode. Valid options: lte, 5g (default: lte)\n"
+              << "  --channel=VAL       Set channel. Valid options: pdsch, pbch, pdcch (default: pdsch)\n"
+              << "  --bandwidth=VAL     Set bandwidth. Valid options: 3, 5, 10, 15, 20 (default: 20)\n"
+              << "  --dmrs-mode=VAL     Set DMRS mode. Valid options: 1, 2, 3, 4, 5 (default: 1)\n";
+}
 
-    for (int i = 1; i < argc; ++i) {
-        auto argPair = splitArg(argv[i]);
-        const std::string& key = argPair.first;
-        const std::string& val = argPair.second;
+void ArgsParser::parse(TestArgs& args, int argc, char* argv[]) {
+    try {
+        for (int i = 1; i < argc; ++i) {
+            std::string argStr = argv[i];
+            
+            // Intercept help flag
+            if (argStr == "--help" || argStr == "-h") {
+                printHelp();
+                std::exit(0); 
+            }
 
-        if      (key == "mode")      modeStr      = val;
-        else if (key == "channel")   channelStr   = val;
-        else if (key == "bandwidth") bandwidthStr = val;
-        else if (key == "dmrs-mode") dmrs_modeStr = val;
-        else
-            throw std::invalid_argument("Unknown argument: --" + key);
+            auto argPair = splitArg(argStr);
+            const std::string& key = argPair.first;
+            const std::string& val = argPair.second;
+
+            if      (key == "mode")      args.mode_str      = val;
+            else if (key == "channel")   args.channel_str   = val;
+            else if (key == "bandwidth") args.bandwidth_str = val;
+            else if (key == "dmrs-mode") args.dmrs_mode_str = val;
+            else
+                throw std::invalid_argument("Unknown argument: --" + key);
+        }
+
+        // Validate and sync Enums
+        args.mode      = lookupEnum("mode",      args.mode_str,      kModeMap);
+        args.channel   = lookupEnum("channel",   args.channel_str,   kChannelMap);
+        args.bandwidth = lookupEnum("bandwidth", args.bandwidth_str, kBandwidthMap);
+        args.dmrs_mode = lookupEnum("dmrs-mode", args.dmrs_mode_str, kDMRSModeMap);
+
+    } catch (const std::exception& e) {
+        std::cerr << "\n[Error] " << e.what() << "\n\n";
+        printHelp();
+        std::exit(1); 
     }
+}
 
-    return TestArgs{
-        lookupEnum("mode",      modeStr,      kModeMap),
-        lookupEnum("channel",   channelStr,   kChannelMap),
-        lookupEnum("bandwidth", bandwidthStr, kBandwidthMap),
-        lookupEnum("dmrs-mode", dmrs_modeStr, kDMRSModeMap),
-        modeStr,
-        channelStr,
-        bandwidthStr,
-        dmrs_modeStr
-    };
+TestArgs ArgsParser::parse(int argc, char* argv[]) {
+    TestArgs args;
+    parse(args, argc, argv);
+    return args;
 }

@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <utility>
+#include <iostream>
 
 // --- Enums -------------------------------------------------------------------
 
@@ -23,17 +24,31 @@ std::string toString(DMRSMode b);
 // --- Config struct -----------------------------------------------------------
 
 struct TestArgs {
-    // Enum values
-    Mode      mode;
-    Channel   channel;
-    Bandwidth bandwidth;
-    DMRSMode dmrs_mode;
+    // Enum values with defaults
+    Mode      mode      = Mode::LTE;
+    Channel   channel   = Channel::PDSCH;
+    Bandwidth bandwidth = Bandwidth::BW_20;
+    DMRSMode  dmrs_mode = DMRSMode::Mode1;
 
-    // String variants
-    std::string mode_str;
-    std::string channel_str;
-    std::string bandwidth_str;
-    std::string dmrs_mode_str;
+    // String variants with defaults
+    std::string mode_str      = "lte";
+    std::string channel_str   = "pdsch";
+    std::string bandwidth_str = "20";
+    std::string dmrs_mode_str = "1";
+
+    // Constructor synchronizes Enums with their string representations
+    TestArgs(Mode m = Mode::LTE, 
+             Channel c = Channel::PDSCH, 
+             Bandwidth b = Bandwidth::BW_20, 
+             DMRSMode d = DMRSMode::Mode1)
+        : mode(m), 
+          channel(c), 
+          bandwidth(b), 
+          dmrs_mode(d),
+          mode_str(toString(m)),
+          channel_str(toString(c)),
+          bandwidth_str(toString(b)),
+          dmrs_mode_str(toString(d)) {}
 
     // Build filepath like: "testdata/lte/pdsch/10MHz/" or "testdata/5g/pdsch/dmrs_mode_2/"
     std::string toVectorsDir(const std::string& base = "..") const {
@@ -92,4 +107,6 @@ private:
 
 public:
     static TestArgs parse(int argc, char* argv[]);
+    static void parse(TestArgs& args, int argc, char* argv[]);
+    static void printHelp();
 };

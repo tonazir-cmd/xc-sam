@@ -45,35 +45,35 @@ implementation reference targeting SDR platforms.
 │           ├── lte_pdsch_params.cpp
 │           └── params_reader.cpp
 ├── matlab/
-├── tests/
-│   ├── cpp_ref/
-│   │   └── ofdm_loopback/
-│   │       ├── Makefile
-│   │       ├── bin/
-│   │       │   └── test.exe
-│   │       └── test/
-│   │           └── test.cpp
-│   ├── matlab_ref/
-│   │   └── demod/
-│   │       ├── Makefile
-│   │       ├── bin/
-│   │       │   └── test.exe
-│   │       └── test/
-│   │           └── test.cpp
-│   └── misc/
-│       ├── sanity_argsparser/
-│       │   ├── Makefile
-│       │   ├── bin/
-│       │       │   └── test.exe
-│       │       └── test/
-│       │           └── test.cpp
-│       └── sanity_lte_pdsch_params/
-│           ├── Makefile
-│           ├── params.txt
-│           ├── bin/
-│           │   └── test.exe
-│           └── test/
-│           └── test.cpp
+└── tests/
+    ├── cpp_ref/
+    │   └── ofdm_loopback/
+    │       ├── Makefile
+    │       ├── bin/
+    │       │   └── test.exe
+    │       └── test/
+    │           └── test.cpp
+    ├── matlab_ref/
+    │   └── demod/
+    │       ├── Makefile
+    │       ├── bin/
+    │       │   └── test.exe
+    │       └── test/
+    │           └── test.cpp
+    └── misc/
+        ├── sanity_argsparser/
+        │   ├── Makefile
+        │   ├── bin/
+        │       │   └── test.exe
+        │       └── test/
+        │           └── test.cpp
+        └── sanity_lte_pdsch_params/
+            ├── Makefile
+            ├── params.txt
+            ├── bin/
+            │   └── test.exe
+            └── test/
+            └── test.cpp
 ```
 
 ## Build
