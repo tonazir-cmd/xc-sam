@@ -158,9 +158,9 @@ static void select_lut(int mcs, int bit_idx,
 
     const int row = bit_idx - 1;
 
-    y_boundaries.set_size(NUM_BOUNDS);
-    x_boundaries.set_size(NUM_BOUNDS);
-    slopes.set_size(NUM_BOUNDS);
+    assert(y_boundaries.length() == NUM_BOUNDS);
+    assert(x_boundaries.length() == NUM_BOUNDS);
+    assert(slopes.length() == NUM_BOUNDS);
 
     for (int b = 0; b < NUM_BOUNDS; ++b) {
         y_boundaries[b] = (sc * sc) * yb_ptr[row][b];
@@ -186,7 +186,7 @@ static void select_lut(int mcs, int bit_idx,
  */
 static itpp::vec vqamdemap_internal(const itpp::vec &R, int mcs, int bit_idx)
 {
-    itpp::vec y_boundaries, x_boundaries, slopes;
+    itpp::vec y_boundaries(NUM_BOUNDS), x_boundaries(NUM_BOUNDS), slopes(NUM_BOUNDS);
     double boundary_width;
     select_lut(mcs, bit_idx, y_boundaries, x_boundaries, slopes, boundary_width);
 

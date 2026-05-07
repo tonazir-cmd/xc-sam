@@ -31,12 +31,12 @@ void ChanEqDemap<N_RX, N_LAYERS>::eval(const Inputs&      in,
         for (size_t layer = 0; layer < N_LAYERS; layer++)
             assert(in.hp[rx][layer].samples.length() == cfg.n_sc);
 
+    for (size_t layer = 0; layer < N_LAYERS; layer++)
+        assert(out.llrs[layer].samples.length() == cfg.n_sc * cfg.qm_mode);
+
     // -------------------------------------------------------------------------
     // Processing
     // -------------------------------------------------------------------------
-    
-    for (size_t layer = 0; layer < N_LAYERS; layer++)
-        out.llrs[layer].samples.set_size(cfg.n_sc * cfg.qm_mode, false);
 
     itpp::QAM modem(1 << cfg.qm_mode);
     itpp::cmat I = itpp::eye_c(N_LAYERS);
@@ -71,7 +71,7 @@ void ChanEqDemap<N_RX, N_LAYERS>::eval(const Inputs&      in,
             itpp::cvec sym(1);
             sym(0) = req(s);
             
-            itpp::vec bits = matlab_ported::demapper_5g(sym, cfg.n_var, (1 << cfg.qm_mode));
+            itpp::vec bits = matlab_ported::demapper_5g(sym, cfg.n_var, (1 << cfg.qm_mode)).get_row(0);
             uint32_t offset = k * cfg.qm_mode;
             
             out.llrs[s].samples.set_subvector(offset, bits);

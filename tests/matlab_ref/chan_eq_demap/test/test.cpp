@@ -59,6 +59,9 @@ int main(int argc, char* argv[]) {
     ChanEqDemap::Inputs chan_eqd_in;
     ChanEqDemap::Outputs chan_eqd_out;
 
+    for (auto layer = 0; layer < N_LAYERS; layer++)
+        chan_eqd_out.llrs[layer].samples.set_size(chan_eqd_cfg.n_sc * chan_eqd_cfg.qm_mode);
+
     for (auto rx = 0; rx < N_RX; rx++)
         chan_eqd_in.rx_grid[rx].samples = in_rx_grid.mid(rx * N_SYM * chan_eqd_cfg.n_sc, chan_eqd_cfg.n_sc);
 
@@ -72,10 +75,6 @@ int main(int argc, char* argv[]) {
     for (auto sc = 0; sc < chan_eqd_cfg.n_sc; sc++)
         for (auto layer = 0; layer < N_LAYERS; layer++)
             out_llrs.set_subvector((sc * N_LAYERS * bits) + (layer * bits), chan_eqd_out.llrs[layer].samples.mid(sc * bits, bits));
-    
-    for (auto sc = 0; sc < 10; sc++)
-        for (auto layer = 0; layer < N_LAYERS; layer++)
-            std::cout << (sc * N_LAYERS * bits) + (layer * bits) << std::endl;
 
     /////////////////////////////////////
     // Channel Estimation - End
