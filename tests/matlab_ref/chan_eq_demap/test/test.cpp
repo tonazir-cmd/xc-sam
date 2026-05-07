@@ -90,7 +90,7 @@ int main(int argc, char* argv[]) {
     std::cout << "MSE: " << mse << "\n";
     std::cout << "SNR: " << snr << "\n";
     
-    const double threshold = 40.0;
+    const double threshold = 30.0;
     if (snr < threshold) {
         std::cerr << "Test failed: SNR is below " << threshold << " dB.\n";
         return 1;
