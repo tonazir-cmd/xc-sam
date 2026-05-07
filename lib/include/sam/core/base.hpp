@@ -26,6 +26,7 @@ namespace sam {
 //   ITPP containers held inside derived Array structs that are passed through
 //   eval() MUST be initialised as non-owning views (shallow references) to
 //   enforce the Zero-Copy Mandate.
+//
 // =============================================================================
 struct Array
 {
@@ -53,6 +54,7 @@ struct Array
 //           bool update_estimate = false;
 //           int  symbol_idx      = 0;
 //       };
+//
 // =============================================================================
 struct Control
 {
@@ -82,6 +84,7 @@ struct Control
 //   numerology      — 5G NR numerology (0=15kHz, 1=30kHz, ...)
 //   start_of_frame  — true on the very first symbol of a new frame
 //   end_of_frame    — true on the very last symbol of the current frame
+//
 // =============================================================================
 struct ExecContext
 {
@@ -109,6 +112,7 @@ struct ExecContext
 //   Every concrete block MUST implement reset(). After reset() returns,
 //   the block's behaviour must be identical to that of a freshly
 //   constructed instance — deterministic initial conditions are mandatory.
+//
 // =============================================================================
 class IProcessingBlock
 {
@@ -122,6 +126,7 @@ public:
     // decoder states, etc.). Must fully restore deterministic initial
     // conditions. Calling eval() after reset() must produce the same
     // output as calling eval() on a fresh instance with identical inputs.
+    //
     // -------------------------------------------------------------------------
     virtual void reset() = 0;
 };
