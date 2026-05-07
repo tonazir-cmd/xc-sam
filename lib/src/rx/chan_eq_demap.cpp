@@ -1,5 +1,5 @@
 #include "sam/rx/chan_eq_demap.hpp"
-
+#include "sam/utils/matlab_ported.hpp"
 #include <itpp/base/specmat.h>
 #include <itpp/base/algebra/inv.h>
 
@@ -7,12 +7,11 @@ namespace sam
 {
 namespace rx
 {
-
-void ChanEqDemap::eval(const Inputs&      in,
-                       Outputs&           out,
-                       const Control&     ctrl,
-                       const Config&      cfg,
-                       const ExecContext& ctx)
+template<size_t N_RX, size_t N_LAYERS>
+void ChanEqDemap<N_RX, N_LAYERS>::eval(const Inputs&      in,
+                                       Outputs&           out,
+                                       const Control&     ctrl,
+                                       const Config&      cfg)
 {
     // -------------------------------------------------------------------------
     // Control
@@ -24,33 +23,39 @@ void ChanEqDemap::eval(const Inputs&      in,
     // Assertions
     // -------------------------------------------------------------------------
     assert(cfg.n_sc > 0);
-    assert(in.hp.size() == cfg.n_rx);
-    assert(in.rx_grid.size() == cfg.n_rx);
+    
+    for (size_t rx = 0; rx < N_RX; rx++)
+        assert(in.rx_grid[rx].samples.length() == cfg.n_sc);
+
+    for (size_t rx = 0; rx < N_RX; rx++)
+        for (size_t layer = 0; layer < N_LAYERS; layer++)
+            assert(in.hp[rx][layer].samples.length() == cfg.n_sc);
 
     // -------------------------------------------------------------------------
     // Processing
     // -------------------------------------------------------------------------
     
-    out.llrs.assign(cfg.n_layers, itpp::zeros(cfg.n_sc * cfg.qm_mode));
+    for (size_t layer = 0; layer < N_LAYERS; layer++)
+        out.llrs[layer].samples.set_size(cfg.n_sc * cfg.qm_mode, false);
 
     itpp::QAM modem(1 << cfg.qm_mode);
-    itpp::cmat I = itpp::eye_c(cfg.n_layers);
+    itpp::cmat I = itpp::eye_c(N_LAYERS);
     std::complex<double> noise_var(cfg.n_var, 0.0);
 
-    itpp::cmat Hp(cfg.n_rx, cfg.n_layers);
-    itpp::cvec r_k(cfg.n_rx);
+    itpp::cmat Hp(N_RX, N_LAYERS);
+    itpp::cvec r_k(N_RX);
 
     for (uint16_t k = 0; k < cfg.n_sc; ++k)
     {
         // 1. Assemble the Hp matrix for subcarrier k
-        for (uint8_t rx = 0; rx < cfg.n_rx; ++rx) {
-            for (uint8_t tx = 0; tx < cfg.n_layers; ++tx) {
-                Hp(rx, tx) = in.hp[rx][tx].samples(k);
+        for (uint8_t rx = 0; rx < N_RX; ++rx) {
+            for (uint8_t layer = 0; layer < N_LAYERS; ++layer) {
+                Hp(rx, layer) = in.hp[rx][layer].samples(k);
             }
         }
 
         // 2. Assemble the received vector for subcarrier k
-        for (uint8_t rx = 0; rx < cfg.n_rx; ++rx) {
+        for (uint8_t rx = 0; rx < N_RX; ++rx) {
             r_k(rx) = in.rx_grid[rx].samples(k);
         }
 
@@ -61,18 +66,20 @@ void ChanEqDemap::eval(const Inputs&      in,
         itpp::cvec req = W * r_k;
 
         // 4. Soft Demapping
-        for (uint8_t s = 0; s < cfg.n_layers; ++s)
+        for (uint8_t s = 0; s < N_LAYERS; ++s)
         {
             itpp::cvec sym(1);
             sym(0) = req(s);
             
-            itpp::vec bits = modem.demodulate_soft_bits(sym, cfg.n_var);
+            itpp::vec bits = matlab_ported::demapper_5g(sym, cfg.n_var, (1 << cfg.qm_mode));
             uint32_t offset = k * cfg.qm_mode;
             
-            out.llrs[s].set_subvector(offset, bits);
+            out.llrs[s].samples.set_subvector(offset, bits);
         }
     }
 }
+
+template class ChanEqDemap<2, 2>;
 
 } // namespace rx
 } // namespace sam

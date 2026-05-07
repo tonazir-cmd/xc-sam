@@ -42,6 +42,39 @@ itpp::cvec read_sc16_as_cvec(const std::string& filename, size_t fix_point, size
     return out_vec;
 }
 
+itpp::ivec read_int8_as_ivec(const std::string& filename, size_t num_samples) {
+    // 1. Open the file in binary mode, starting at the end to get the size
+    std::ifstream file(filename, std::ios::binary | std::ios::ate);
+    
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << std::endl;
+        return itpp::ivec(); // Return an empty vector on failure
+    }
+    
+    // 2. Determine the number of bytes (which equals the number of int8 elements)
+    size_t total_num_samples = file.tellg();
+    file.seekg(0, std::ios::beg); // Rewind back to the beginning
+
+    THROW_ERROR(num_samples > total_num_samples, "Requested number of samples exceeds total samples in file.");
+    if (num_samples == 0) num_samples = total_num_samples;
+
+    // 3. Read the raw 8-bit data into a standard C++ vector
+    std::vector<int8_t> buffer(num_samples);
+    if (!file.read(reinterpret_cast<char*>(buffer.data()), num_samples)) {
+        std::cerr << "Error: Failed to read data from " << filename << std::endl;
+        return itpp::ivec();
+    }
+    
+    // 4. Create the IT++ ivec and safely cast/copy the data over
+    itpp::ivec result(num_samples);
+    for (size_t i = 0; i < num_samples; ++i) {
+        // The static_cast ensures the sign bit is preserved when expanding to 32-bit
+        result(i) = static_cast<int>(buffer[i]);
+    }
+    
+    return result;
+}
+
 void save_cvec_as_complex128(const itpp::cvec& vec, const std::string& filename) {
     std::ofstream outfile(filename, std::ios::binary | std::ios::app);    
     THROW_ERROR(!outfile.is_open(), "Could not open file " + filename + " for writing/appending.");
