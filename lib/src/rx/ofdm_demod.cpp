@@ -11,7 +11,7 @@ namespace sam
 namespace rx
 {
 
-void OFDMDemod::eval(const Inputs&      in,
+void OfdmDemod::eval(const Inputs&      in,
                      Outputs&           out,
                      const Control&     ctrl,
                      const Config&      cfg,
@@ -53,7 +53,7 @@ void OFDMDemod::eval(const Inputs&      in,
 // Private Helpers
 // =============================================================================
 
-itpp::cvec OFDMDemod::apply_front_end_corrections_(const itpp::cvec& in_samples,
+itpp::cvec OfdmDemod::apply_front_end_corrections_(const itpp::cvec& in_samples,
                                              const Config& cfg,
                                              const ExecContext& ctx)
 {
@@ -77,7 +77,7 @@ itpp::cvec OFDMDemod::apply_front_end_corrections_(const itpp::cvec& in_samples,
     return output;
 }
 
-itpp::cvec OFDMDemod::extract_subcarriers_(const itpp::cvec& fft_out,
+itpp::cvec OfdmDemod::extract_subcarriers_(const itpp::cvec& fft_out,
                                      uint16_t n_fft, uint16_t n_sc, bool dc)
 {
     const int half = n_sc / 2;
@@ -89,7 +89,7 @@ itpp::cvec OFDMDemod::extract_subcarriers_(const itpp::cvec& fft_out,
     return sc_data;
 }
 
-itpp::cvec OFDMDemod::apply_idft_precoding_(const itpp::cvec& in_sc)
+itpp::cvec OfdmDemod::apply_idft_precoding_(const itpp::cvec& in_sc)
 {
     itpp::cvec out_sc = itpp::ifft(in_sc);
     out_sc *= std::sqrt(static_cast<double>(in_sc.size()));

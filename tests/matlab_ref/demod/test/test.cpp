@@ -31,7 +31,7 @@ struct TestParams
     size_t t_off;
     std::string input_bin;
     std::string reference_bin;
-    sam::rx::OFDMDemod::Config demod_config;
+    sam::rx::OfdmDemod::Config demod_config;
 };
 
 TestParams get_test_params(TestArgs args);
@@ -43,11 +43,11 @@ int main(int argc, char* argv[]) {
     std::cout << args;
 
     TestParams params = get_test_params(args);
-    sam::rx::OFDMDemod::Config& demod_config = params.demod_config;
+    sam::rx::OfdmDemod::Config& demod_config = params.demod_config;
 
     itpp::cvec input = read_sc16_as_cvec(params.input_bin, 15);
 
-    sam::rx::OFDMDemod demod;
+    sam::rx::OfdmDemod demod;
     sam::Control ctrl;
     sam::ExecContext ctx{0};
     sam::SignalData demod_in, demod_out;

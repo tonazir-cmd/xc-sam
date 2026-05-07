@@ -203,7 +203,7 @@ void PhyTx::eval(...) {
 
 | Block | Unit | Description |
 | :--- | :--- | :--- |
-| `sam::rx::OFDMDemod` | OFDM symbol | FFT, cyclic prefix removal, subcarrier extraction, optional IDFT precoding |
+| `sam::rx::OfdmDemod` | OFDM symbol | FFT, cyclic prefix removal, subcarrier extraction, optional IDFT precoding |
 
 ---
 

@@ -1,5 +1,5 @@
 // =============================================================================
-// test.cpp — OFDMMod -> Channel -> OFDMDemod Parametric Sweep
+// test.cpp — OFDMMod -> Channel -> OfdmDemod Parametric Sweep
 // Extracted inner loopback into run_ofdm_loopback(); main sweeps test_configs.
 // =============================================================================
 
@@ -139,7 +139,7 @@ static void apply_channel(const itpp::cvec& in, itpp::cvec& out,
     out = elem_mult(sig, rot);
 }
 
-void populate_ofdm_cfgs(const OFDMTestConfig& cfg, sam::tx::OFDMMod::Config& mod_cfg, sam::rx::OFDMDemod::Config& dem_cfg) {
+void populate_ofdm_cfgs(const OFDMTestConfig& cfg, sam::tx::OFDMMod::Config& mod_cfg, sam::rx::OfdmDemod::Config& dem_cfg) {
     mod_cfg.n_fft         = cfg.n_fft;
     mod_cfg.n_sc          = cfg.n_sc;
     mod_cfg.n_win         = cfg.n_win;
@@ -175,11 +175,11 @@ itpp::cvec run_ofdm_loopback(const OFDMTestConfig& cfg, const itpp::cvec& tx_inp
 
     // --- Build mod / demod configs -------------------------------------------
     sam::tx::OFDMMod::Config mod_cfg;
-    sam::rx::OFDMDemod::Config dem_cfg;
+    sam::rx::OfdmDemod::Config dem_cfg;
     populate_ofdm_cfgs(cfg, mod_cfg, dem_cfg);
 
     sam::tx::OFDMMod   mod;
-    sam::rx::OFDMDemod demod;
+    sam::rx::OfdmDemod demod;
     sam::Control       ctrl;
 
     itpp::cvec tx_waveform(N_SYM * sym_len);

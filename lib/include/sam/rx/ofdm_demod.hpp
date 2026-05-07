@@ -14,7 +14,7 @@ namespace sam
 namespace rx
 {
 
-class OFDMDemod : public IProcessingBlock
+class OfdmDemod : public IProcessingBlock
 {
 public:
     using Inputs  = SignalData;  // time-domain samples (n_fft + cp)
@@ -37,14 +37,14 @@ public:
         bool curr_sym_windowing = false;
     };
 
-    OFDMDemod() = default;
-    ~OFDMDemod() override = default;
+    OfdmDemod() = default;
+    ~OfdmDemod() override = default;
 
-    OFDMDemod(const OFDMDemod&)            = delete;
-    OFDMDemod& operator=(const OFDMDemod&) = delete;
+    OfdmDemod(const OfdmDemod&)            = delete;
+    OfdmDemod& operator=(const OfdmDemod&) = delete;
 
-    OFDMDemod(OFDMDemod&&)            = default;
-    OFDMDemod& operator=(OFDMDemod&&) = default;
+    OfdmDemod(OfdmDemod&&)            = default;
+    OfdmDemod& operator=(OfdmDemod&&) = default;
 
     void reset() override {};
 
