@@ -22,10 +22,10 @@ itpp::cvec read_sc16_as_cvec(const std::string& filename, size_t fix_point, size
     const std::streamsize file_size = file.tellg();
     file.seekg(0, std::ios::beg);
 
-    THROW_ERROR(file_size % (2 * sizeof(int16_t)) != 0, "File size not a multiple of sc16 sample size (4 bytes).");
+    THROW_ERROR(file_size % (2 * sizeof(int16_t)) != 0, "File size not a multiple of sc16 sample size (4 bytes). File: " + filename);
 
     size_t total_num_samples = static_cast<size_t>(file_size / (2 * sizeof(int16_t)));
-    THROW_ERROR(num_samples > total_num_samples, "Requested number of samples exceeds total samples in file.");
+    THROW_ERROR(num_samples > total_num_samples, "Requested number of samples exceeds total samples in file.\nTotal Samples: " + std::to_string(total_num_samples) + ". Requested Samples: " + std::to_string(num_samples) + ".\nFile: " + filename);
     if (num_samples == 0) num_samples = total_num_samples;
     
     const double scale = 1.0 / static_cast<double>(1 << fix_point);
@@ -34,7 +34,7 @@ itpp::cvec read_sc16_as_cvec(const std::string& filename, size_t fix_point, size
     
     std::streamsize bytes_to_read = num_samples * 2 * sizeof(int16_t);
     char * raw_ptr = reinterpret_cast<char*>(raw.data());
-    THROW_ERROR(!file.read(raw_ptr, bytes_to_read), "Error reading complex binary data from file: " + filename);
+    THROW_ERROR(!file.read(raw_ptr, bytes_to_read), "Error reading complex binary data. File: " + filename);
     
     itpp::cvec out_vec(num_samples);
     for (size_t i = 0; i < num_samples; i++) out_vec(i) = std::complex<double>(raw[i].real() * scale, raw[i].imag() * scale);
@@ -55,7 +55,7 @@ itpp::ivec read_int8_as_ivec(const std::string& filename, size_t num_samples) {
     size_t total_num_samples = file.tellg();
     file.seekg(0, std::ios::beg); // Rewind back to the beginning
 
-    THROW_ERROR(num_samples > total_num_samples, "Requested number of samples exceeds total samples in file.");
+    THROW_ERROR(num_samples > total_num_samples, "Requested number of samples exceeds total samples in file.\nTotal Samples: " + std::to_string(total_num_samples) + ". Requested Samples: " + std::to_string(num_samples) + ".\nFile: " + filename);
     if (num_samples == 0) num_samples = total_num_samples;
 
     // 3. Read the raw 8-bit data into a standard C++ vector

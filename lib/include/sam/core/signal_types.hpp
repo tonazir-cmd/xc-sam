@@ -35,6 +35,7 @@ namespace sam {
 // The 'samples' field is an itpp::cvec. When passed as eval() Inputs or
 // Outputs it must be a non-owning view. When held as a member variable it
 // is a full owning container.
+//
 // -----------------------------------------------------------------------------
 struct SignalData : public Array
 {
@@ -51,6 +52,7 @@ struct SignalData : public Array
 // The 'grid' field is an itpp::cmat. When passed as eval() Inputs or
 // Outputs it must be a non-owning view. When held as a member variable it
 // is a full owning container.
+//
 // -----------------------------------------------------------------------------
 struct SignalGrid : public Array
 {
@@ -68,6 +70,7 @@ struct SignalGrid : public Array
 // The 'samples' field is an itpp::vec. As per the Zero-Copy Mandate, this 
 // container must be used as a non-owning view during eval() to reference 
 // externally allocated real-valued buffers.
+//
 // -----------------------------------------------------------------------------
 struct RealData : public Array
 {

@@ -24,16 +24,16 @@ public:
     {
         // 2D grid of references to the cvecs output by ChanEst. 
         // Dimensions: [n_rx][n_layers]. Each contains an n_sc length cvec.
-        sam::SignalData hp[N_RX][N_LAYERS];
+        sam::SignalData* hp[N_RX][N_LAYERS];
 
         // Dimensions: [n_rx]. Each contains an n_sc length cvec.
-        sam::SignalData rx_grid[N_RX];
+        sam::SignalData* rx_grid[N_RX];
     };
 
     struct Outputs
     {
         // LLRs per layer: size n_layers, each n_sc * qm_mode
-        sam::RealData llrs[N_LAYERS];
+        sam::RealData* llrs[N_LAYERS];
     };
 
     struct Config

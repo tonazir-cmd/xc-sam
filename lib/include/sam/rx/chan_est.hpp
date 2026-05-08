@@ -16,7 +16,12 @@ namespace rx
 class ChannelEstimator : public IProcessingBlock
 {
 public:
-    using Inputs  = SignalData;  // Received frequency-domain subcarriers (n_sc)
+    struct Inputs
+    {
+        const SignalData* rx;
+        const SignalData* dmrs;
+    };
+
     using Outputs = SignalData;  // Estimated channel response H (n_sc)
 
     // Strongly typed enum for DMRS Pattern configuration
@@ -31,7 +36,6 @@ public:
     {
         uint16_t    n_sc;
         DMRSPattern dmrs_pattern;
-        itpp::cvec  dmrs_seq;
     };
 
     ChannelEstimator() = default;
@@ -48,8 +52,7 @@ public:
     void eval(const Inputs&      in,
               Outputs&           out,
               const Control&     ctrl,
-              const Config&      cfg,
-              const ExecContext& ctx);
+              const Config&      cfg);
 
 private:
     // -------------------------------------------------------------------------

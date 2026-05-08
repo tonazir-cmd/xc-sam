@@ -1,5 +1,3 @@
-#pragma once
-
 #include <itpp/itbase.h>
 
 #include <vector>

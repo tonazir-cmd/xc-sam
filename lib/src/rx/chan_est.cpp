@@ -14,26 +14,25 @@ namespace rx
 void ChannelEstimator::eval(const Inputs&      in,
                             Outputs&           out,
                             const Control&     ctrl,
-                            const Config&      cfg,
-                            const ExecContext& ctx)
+                            const Config&      cfg)
 {
     // -------------------------------------------------------------------------
     // Control
     // -------------------------------------------------------------------------
     if (!ctrl.enable) return;
-    if (ctrl.bypass) { out.samples = in.samples; return; }
+    if (ctrl.bypass) return;
 
     // -------------------------------------------------------------------------
     // Assertions
     // -------------------------------------------------------------------------
     assert(cfg.n_sc > 0);
-    assert(in.samples.length() == cfg.n_sc);
-    assert(cfg.dmrs_seq.length() == cfg.n_sc);
+    assert(in.rx->samples.length() == cfg.n_sc);
+    assert(in.dmrs->samples.length() == (cfg.n_sc / 2));
 
     // -------------------------------------------------------------------------
     // Processing
     // -------------------------------------------------------------------------
-    itpp::cvec hest = ls_estimate_(in.samples, cfg.dmrs_seq, cfg.n_sc, cfg.dmrs_pattern);
+    itpp::cvec hest = ls_estimate_(in.rx->samples, in.dmrs->samples, cfg.n_sc, cfg.dmrs_pattern);
     average_adjacent_pilots_(hest, cfg.n_sc, cfg.dmrs_pattern);
     interpolate_(hest, cfg.n_sc, cfg.dmrs_pattern);
     extrapolate_edges_(hest, cfg.n_sc, cfg.dmrs_pattern);

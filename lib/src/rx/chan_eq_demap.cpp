@@ -25,14 +25,14 @@ void ChanEqDemap<N_RX, N_LAYERS>::eval(const Inputs&      in,
     assert(cfg.n_sc > 0);
     
     for (size_t rx = 0; rx < N_RX; rx++)
-        assert(in.rx_grid[rx].samples.length() == cfg.n_sc);
+        assert(in.rx_grid[rx]->samples.length() == cfg.n_sc);
 
     for (size_t rx = 0; rx < N_RX; rx++)
         for (size_t layer = 0; layer < N_LAYERS; layer++)
-            assert(in.hp[rx][layer].samples.length() == cfg.n_sc);
+            assert(in.hp[rx][layer]->samples.length() == cfg.n_sc);
 
     for (size_t layer = 0; layer < N_LAYERS; layer++)
-        assert(out.llrs[layer].samples.length() == cfg.n_sc * cfg.qm_mode);
+        assert(out.llrs[layer]->samples.length() == cfg.n_sc * cfg.qm_mode);
 
     // -------------------------------------------------------------------------
     // Processing
@@ -50,13 +50,13 @@ void ChanEqDemap<N_RX, N_LAYERS>::eval(const Inputs&      in,
         // 1. Assemble the Hp matrix for subcarrier k
         for (uint8_t rx = 0; rx < N_RX; ++rx) {
             for (uint8_t layer = 0; layer < N_LAYERS; ++layer) {
-                Hp(rx, layer) = in.hp[rx][layer].samples(k);
+                Hp(rx, layer) = in.hp[rx][layer]->samples(k);
             }
         }
 
         // 2. Assemble the received vector for subcarrier k
         for (uint8_t rx = 0; rx < N_RX; ++rx) {
-            r_k(rx) = in.rx_grid[rx].samples(k);
+            r_k(rx) = in.rx_grid[rx]->samples(k);
         }
 
         // 3. Matrix Math
@@ -74,7 +74,7 @@ void ChanEqDemap<N_RX, N_LAYERS>::eval(const Inputs&      in,
             itpp::vec bits = matlab_ported::demapper_5g(sym, cfg.n_var, (1 << cfg.qm_mode)).get_row(0);
             uint32_t offset = k * cfg.qm_mode;
             
-            out.llrs[s].samples.set_subvector(offset, bits);
+            out.llrs[s]->samples.set_subvector(offset, bits);
         }
     }
 }
