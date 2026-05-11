@@ -13,7 +13,13 @@ namespace sam
 {
 namespace rx
 {
-
+/**
+ * @class OfdmDemod
+ * @brief Performs OFDM demodulation, including CP removal, FFT, and subcarrier extraction.
+ * * This processing block converts time-domain IQ samples into frequency-domain 
+ * subcarrier data. It supports front-end signal corrections, optional DC subcarrier 
+ * nulling, and IDFT decoding for SC-FDMA (DFT-precoded) signals.
+ */
 class OfdmDemod : public IProcessingBlock
 {
 public:
@@ -22,9 +28,9 @@ public:
 
     struct Config
     {
-        uint16_t n_fft;
-        uint16_t n_sc;
-        uint16_t cp;
+        uint16_t n_fft; // FFT size
+        uint16_t n_sc; // Number of subcarriers
+        uint16_t cp; // cyclic prefix
         bool dft_precoding; // enable idft decoding
 
         // Front-end signal correction parameters
@@ -48,6 +54,14 @@ public:
 
     void reset() override {};
 
+    /**
+     * @brief Transforms time-domain samples into frequency-domain resource grids.
+     * * @param in   Input structure containing time-domain IQ samples.
+     * @param out  Output structure to be populated with extracted subcarriers.
+     * @param ctrl Control metadata for timing and frame synchronization.
+     * @param cfg  Functional configuration for FFT, CP, and corrections.
+     * @param ctx  Execution context for hardware-specific or environmental state.
+     */
     void eval(const Inputs&      in,
               Outputs&           out,
               const Control&     ctrl,

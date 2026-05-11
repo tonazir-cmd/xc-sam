@@ -43,23 +43,6 @@ struct SignalData : public Array
 };
 
 // -----------------------------------------------------------------------------
-// SignalGrid
-//
-// General-purpose complex signal container used for:
-//   - Rx / Tx Signal Grid
-//   - Channel Response (H) Grid
-//
-// The 'grid' field is an itpp::cmat. When passed as eval() Inputs or
-// Outputs it must be a non-owning view. When held as a member variable it
-// is a full owning container.
-//
-// -----------------------------------------------------------------------------
-struct SignalGrid : public Array
-{
-    itpp::cmat grid;
-};
-
-// -----------------------------------------------------------------------------
 // RealData
 //
 // General-purpose real-valued signal container used for:

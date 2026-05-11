@@ -101,9 +101,9 @@ int main(int argc, char* argv[]) {
     //////////////////////////////////////
 
     sam::RealData llrs_out[N_LAYERS][N_SYM - 1];
-    for (size_t tx = 0; tx < N_LAYERS; tx++)
+    for (size_t layer = 0; layer < N_LAYERS; layer++)
         for (size_t sym = 0; sym < (N_SYM - 1); sym++)
-            llrs_out[tx][sym].samples.set_size(params.n_sc * params.qm_mode);
+            llrs_out[layer][sym].samples.set_size(params.n_sc * params.qm_mode);
 
     
     //////////////////////////////////////
@@ -118,8 +118,8 @@ int main(int argc, char* argv[]) {
     sam::ExecContext ctx{0};
     ctx.sample_count = params.t_off;
 
-    for (size_t tx = 0; tx < N_LAYERS; tx++)
-        in.dmrs[tx] = &dmrs[tx];
+    for (size_t layer = 0; layer < N_LAYERS; layer++)
+        in.dmrs[layer] = &dmrs[layer];
 
     size_t out_sym_idx = 0;
     for (size_t sym_idx = 0; sym_idx < N_SYM; sym_idx++) {
@@ -128,18 +128,24 @@ int main(int argc, char* argv[]) {
         config.demod.cp = params.cp_array[sym_idx];
 
         for (size_t rx = 0; rx < N_RX; rx++) in.rx[rx] = &rx_grid_in[rx][sym_idx];
-        for (size_t tx = 0; tx < N_LAYERS; tx++) out.llrs[tx] = &llrs_out[tx][out_sym_idx];
+        for (size_t layer = 0; layer < N_LAYERS; layer++) out.llrs[layer] = &llrs_out[layer][out_sym_idx];
         ofdm_irx.eval(in, out, ctrl, config, ctx);
 
         if (out.valid) out_sym_idx++;
         ctx.sample_count += sym_len;
     }
 
-    for (size_t sym_idx = N_SYM; sym_idx < N_SYM + config.process_delay; sym_idx++) {
+    // Getting remaining outputs for comparison
+    // Disabling demod and chan estimation as we will not be running those
+    ctrl.demod.enable = false;
+    ctrl.chan_est.enable = false;
+    
+    ctx.slot_idx = 1;
+    for (size_t sym_idx = 0; sym_idx < config.process_delay; sym_idx++) {
         ctx.symbol_idx = sym_idx;
         
-        for (size_t tx = 0; tx < N_LAYERS; tx++)
-            out.llrs[tx] = &llrs_out[tx][out_sym_idx];
+        for (size_t layer = 0; layer < N_LAYERS; layer++)
+            out.llrs[layer] = &llrs_out[layer][out_sym_idx];
 
         ofdm_irx.eval(in, out, ctrl, config, ctx);
 
@@ -151,13 +157,14 @@ int main(int argc, char* argv[]) {
     const auto n_sc = params.n_sc;
     const auto n_bits = params.qm_mode;
 
+    // rearranging output in way reference is saved
     itpp::ivec output(params.n_sc * params.qm_mode * (N_SYM - 1) * N_LAYERS);
     for (size_t sym = 0; sym < (N_SYM - 1); sym++)
         for (size_t sc = 0; sc < n_sc; sc++)
-            for (size_t tx = 0; tx < N_LAYERS; tx++)
+            for (size_t layer = 0; layer < N_LAYERS; layer++)
                 output.set_subvector(
-                    (sym * N_LAYERS * n_bits * n_sc) + (sc * N_LAYERS * n_bits) + (tx * n_bits),
-                    itpp::to_ivec(llrs_out[tx][sym].samples.mid(sc * n_bits, n_bits))
+                    (sym * N_LAYERS * n_bits * n_sc) + (sc * N_LAYERS * n_bits) + (layer * n_bits),
+                    itpp::to_ivec(llrs_out[layer][sym].samples.mid(sc * n_bits, n_bits))
                 );
 
     double mse = itpp::mean(itpp::abs(output - reference));
@@ -167,8 +174,9 @@ int main(int argc, char* argv[]) {
     std::cout << "MSE: " << mse << "\n";
     std::cout << "SNR: " << snr << "\n";
     
-    if (snr < 30) {
-        std::cerr << "Test failed: SNR is below 30 dB.\n";
+    const double threshold = 30.0;
+    if (snr < threshold) {
+        std::cerr << "Test failed: SNR is below " << threshold << " dB.\n";
         return 1;
     }
 
@@ -225,10 +233,10 @@ OfdmIRX::Config populate_config(const TestParams& params)
     config.demod.dc = params.dc;
     config.demod.dft_precoding = params.dft_precoding;
 
-    for (auto tx = 0; tx < N_LAYERS; tx++)
+    for (auto layer = 0; layer < N_LAYERS; layer++)
     {
-        config.chan_est[tx].n_sc = params.n_sc;
-        config.chan_est[tx].dmrs_pattern = params.dmrs_pattern[tx];
+        config.chan_est[layer].n_sc = params.n_sc;
+        config.chan_est[layer].dmrs_pattern = params.dmrs_pattern[layer];
     }
 
     config.chan_eq_demap.n_sc = params.n_sc;

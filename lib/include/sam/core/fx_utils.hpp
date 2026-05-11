@@ -29,6 +29,7 @@ namespace fx {
 // Simulates the rounding of a floating-point value to the resolution of a
 // fixed-point format with `fractional_bits` fractional bits.
 // Uses round-half-to-even (banker's rounding) to match typical hardware.
+//
 // -----------------------------------------------------------------------------
 double quantize_fx(double value, int total_bits, int fractional_bits);
 
@@ -43,6 +44,7 @@ std::complex<double> quantize_fx(std::complex<double> value,
 // signed fixed-point format defined by (total_bits, fractional_bits).
 //   max_val =  (2^(total_bits-1) - 1) / 2^fractional_bits
 //   min_val = -(2^(total_bits-1))     / 2^fractional_bits
+//
 // -----------------------------------------------------------------------------
 double saturate_fx(double value, int total_bits, int fractional_bits);
 
@@ -59,6 +61,7 @@ std::complex<double> saturate_fx(std::complex<double> value,
 //
 // All fixed-point operations involving a limited register width (e.g.
 // accumulator output, data-bus output) MUST use this combined function.
+//
 // -----------------------------------------------------------------------------
 double quantize_saturate_fx(double value, int total_bits, int fractional_bits);
 

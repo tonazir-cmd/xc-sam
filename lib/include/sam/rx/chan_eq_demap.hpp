@@ -15,32 +15,50 @@ namespace sam
 namespace rx
 {
 
+/**
+ * @class ChanEqDemap
+ * @brief Performs Joint Channel Equalization and Soft Demapping for MIMO-OFDM systems.
+ *
+ * This processing block evaluates received OFDM grids across multiple receive antennas 
+ * to estimate transmitted bits. It applies the combined N_RX x N_LAYERS channel 
+ * matrix (H) to the received signals to perform spatial equalization, and subsequently 
+ * computes Log-Likelihood Ratios (LLRs) based on the specified QAM constellation.
+ *
+ * @tparam N_RX     Number of receive antennas.
+ * @tparam N_LAYERS Number of spatial transmission layers.
+ *
+ * @note Implementation Detail: This class utilizes raw pointer arrays within the 
+ * Inputs and Outputs structures to interface with external signal buffers. 
+ * Callers must ensure that the source buffers (e.g., from ChanEst or OfdmDemod) 
+ * remain in scope and outlive the execution of the eval() method.
+ */
 template<size_t N_RX, size_t N_LAYERS>
 class ChanEqDemap : public IProcessingBlock
 {
 public:
-    // Replaced arrays of vectors with clean matrix/vector structures
     struct Inputs
     {
-        // 2D grid of references to the cvecs output by ChanEst. 
-        // Dimensions: [n_rx][n_layers]. Each contains an n_sc length cvec.
+        // 2D array of pointers to the channel estimates (H) provided by ChanEst.
+        // Dimensions: [N_RX][N_LAYERS]. Requires one estimate per Rx/Layer pair.
         sam::SignalData* hp[N_RX][N_LAYERS];
 
-        // Dimensions: [n_rx]. Each contains an n_sc length cvec.
+        //1D array of pointers to the received resource grids from OfdmDemod.
+        // Dimensions: [N_RX]. Requires one resource grid per rx antenna.
         sam::SignalData* rx_grid[N_RX];
     };
 
     struct Outputs
     {
-        // LLRs per layer: size n_layers, each n_sc * qm_mode
+        // 1D array of pointers to the output LLR (Log-Likelihood Ratio) buffers.
+        // Dimensions: [N_LAYERS]. Generates one LLR buffer per tx layer.
         sam::RealData* llrs[N_LAYERS];
     };
 
     struct Config
     {
-        uint16_t n_sc;
-        uint8_t  qm_mode;
-        double   n_var;
+        uint16_t n_sc;    ///< Number of active subcarriers.
+        uint8_t  qm_mode; ///< Modulation order indicator (QAM constellation size = 2^qm_mode).
+        double   n_var;   ///< Estimated noise variance.
     };
 
     ChanEqDemap() = default;
@@ -53,7 +71,15 @@ public:
     ChanEqDemap& operator=(ChanEqDemap&&) = default;
 
     void reset() override {};
-
+    
+    /**
+     * @brief Executes the primary equalization and demapping processing loop.
+     *
+     * @param in   Input structure containing H-matrix estimates and received OFDM grids.
+     * @param out  Output structure to be populated with computed LLRs.
+     * @param ctrl Control signals containing timing and frame metadata.
+     * @param cfg  Operational configuration, including subcarrier count and noise variance.
+     */
     void eval(const Inputs&      in,
               Outputs&           out,
               const Control&     ctrl,
