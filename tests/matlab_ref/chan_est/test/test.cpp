@@ -48,7 +48,9 @@ int main(int argc, char* argv[]) {
     sam::rx::ChannelEstimator::Config& chan_est_cfg = params.chan_est_cfg;
 
     itpp::cvec in = read_sc16_as_cvec(params.input_bin, 8, chan_est_cfg.n_sc * N_SYM);
-    chan_est_cfg.dmrs_seq = read_sc16_as_cvec(params.dmrs_bin, 15, chan_est_cfg.n_sc);
+    
+
+    itpp::cvec dmrs_seq = read_sc16_as_cvec(params.dmrs_bin, 15, chan_est_cfg.n_sc / 2);
     itpp::cvec out(chan_est_cfg.n_sc);
 
     /////////////////////////////////////
@@ -57,14 +59,21 @@ int main(int argc, char* argv[]) {
 
     sam::rx::ChannelEstimator chan_est;
     sam::Control ctrl;
-    sam::ExecContext ctx{0};
-    sam::SignalData chan_est_in, chan_est_out;
 
-    size_t sym_idx = 2;
-    ctx.sample_count = sym_idx * chan_est_cfg.n_sc;
+    sam::SignalData rx_grid;
+    sam::SignalData dmrs;
+    sam::rx::ChannelEstimator::Inputs chan_est_in;
+    sam::SignalData chan_est_out;
 
-    chan_est_in.samples = in.mid(ctx.sample_count, chan_est_cfg.n_sc);
-    chan_est.eval(chan_est_in, chan_est_out, ctrl, chan_est_cfg, ctx);
+    const size_t dmrs_sym_idx = 2;
+    rx_grid.samples = in.mid(dmrs_sym_idx * chan_est_cfg.n_sc, chan_est_cfg.n_sc);
+    dmrs.samples = dmrs_seq;
+
+    chan_est_in.rx = &rx_grid;
+    chan_est_in.dmrs = &dmrs;
+
+    chan_est.eval(chan_est_in, chan_est_out, ctrl, chan_est_cfg);
+    
     out = chan_est_out.samples;
 
     /////////////////////////////////////

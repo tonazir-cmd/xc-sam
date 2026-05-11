@@ -56,25 +56,41 @@ int main(int argc, char* argv[]) {
 
     ChanEqDemap chan_eqd;
     sam::Control ctrl;
+
+    sam::SignalData hp[N_RX][N_LAYERS];
+    sam::SignalData rx_grid[N_RX];
+    sam::RealData llrs[N_LAYERS];
+    
     ChanEqDemap::Inputs chan_eqd_in;
     ChanEqDemap::Outputs chan_eqd_out;
 
     for (auto layer = 0; layer < N_LAYERS; layer++)
-        chan_eqd_out.llrs[layer].samples.set_size(chan_eqd_cfg.n_sc * chan_eqd_cfg.qm_mode);
+    {
+        llrs[layer].samples.set_size(chan_eqd_cfg.n_sc * chan_eqd_cfg.qm_mode);
+        chan_eqd_out.llrs[layer] = &llrs[layer];
+    }
 
     for (auto rx = 0; rx < N_RX; rx++)
-        chan_eqd_in.rx_grid[rx].samples = in_rx_grid.mid(rx * N_SYM * chan_eqd_cfg.n_sc, chan_eqd_cfg.n_sc);
+    {
+        rx_grid[rx].samples = in_rx_grid.mid(rx * N_SYM * chan_eqd_cfg.n_sc, chan_eqd_cfg.n_sc);
+        chan_eqd_in.rx_grid[rx] = &rx_grid[rx];
+    }
 
     for (auto layer = 0; layer < N_LAYERS; layer++)
+    {
         for (auto rx = 0; rx < N_RX; rx++)
-            chan_eqd_in.hp[rx][layer].samples = in_hp.mid((rx + (layer * 2)) * chan_eqd_cfg.n_sc, chan_eqd_cfg.n_sc);
+        {
+            hp[rx][layer].samples = in_hp.mid((rx + (layer * 2)) * chan_eqd_cfg.n_sc, chan_eqd_cfg.n_sc);
+            chan_eqd_in.hp[rx][layer] = &hp[rx][layer];
+        }
+    }
 
     chan_eqd.eval(chan_eqd_in, chan_eqd_out, ctrl, chan_eqd_cfg);
 
     int bits = params.chan_eqd_cfg.qm_mode;
     for (auto sc = 0; sc < chan_eqd_cfg.n_sc; sc++)
         for (auto layer = 0; layer < N_LAYERS; layer++)
-            out_llrs.set_subvector((sc * N_LAYERS * bits) + (layer * bits), chan_eqd_out.llrs[layer].samples.mid(sc * bits, bits));
+            out_llrs.set_subvector((sc * N_LAYERS * bits) + (layer * bits), llrs[layer].samples.mid(sc * bits, bits));
 
     /////////////////////////////////////
     // Channel Estimation - End
