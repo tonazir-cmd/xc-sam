@@ -71,6 +71,10 @@ void ChanEqDemap<N_RX, N_LAYERS>::eval(const Inputs&      in,
             itpp::cvec sym(1);
             sym(0) = req(s);
             
+            // itpp soft bit demapper  qam mapping is not in accordance with 3GPP
+            // our implementation also interleaves the IQ bits as I0-Q0-I1-Q1
+            // our implementation also does saturation during lut hence causing magnitude mismatch
+            // hence matlab implementation has been ported as is
             itpp::vec bits = matlab_ported::demapper_5g(sym, cfg.n_var, (1 << cfg.qm_mode)).get_row(0);
             uint32_t offset = k * cfg.qm_mode;
             
